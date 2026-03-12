@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FaceMesh 调试版</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #1a1a2e;
+      color: white;
+      padding: 20px;
+    }
+    h1 { margin-bottom: 20px; }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    video, canvas {
+      width: 100%;
+      max-width: 640px;
+      border-radius: 10px;
+      background: #000;
+    }
+    .log {
+      background: #000;
+      color: #0f0;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #00d4aa;
+      color: #000;
+      font-weight: bold;
+      margin: 10px 5px;
+    }
+    button:disabled { background: #666; }
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 8px;
+      background: #333;
+    }
+    .status.success { background: #0a0; color: #fff; }
+    .status.error { background: #a00; color: #fff; }
+    .status.warning { background: #aa0; color: #000; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 FaceMesh 调试工具</h1>
+    
+    <div class="status" id="status">准备就绪</div>
+    
+    <video id="video" width="640" height="480" playsinline autoplay muted></video>
+    <canvas id="canvas" width="640" height="480"></canvas>
+    
+    <div>
+      <button id="startBtn">启动摄像头</button>
+      <button id="detectBtn" disabled>开始检测</button>
+      <button id="stopBtn" disabled>停止</button>
+    </div>
+    
+    <div class="log" id="log"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const startBtn = document.getElementById('startBtn');
+    const detectBtn = document.getElementById('detectBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const status = document.getElementById('status');
+    const logEl = document.getElementById('log');
+    
+    let stream = null;
+    let faceMesh = null;
+    let isRunning = false;
+    
+    function log(msg, type = 'info') {
+      const time = new Date().toLocaleTimeString();
+      const color = type === 'error' ? '#f44' : type === 'success' ? '#0f0' : '#0f0';
+      logEl.innerHTML += `<div style="color:${color}">[${time}] ${msg}</div>`;
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(msg);
+    }
+    
+    function setStatus(msg, type = '') {
+      status.textContent = msg;
+      status.className = 'status ' + type;
+    }
+    
+    // 检查库加载
+    log('检查 FaceMesh 库...');
+    if (typeof FaceMesh === 'undefined') {
+      log('❌ FaceMesh 库未加载！', 'error');
+      setStatus('FaceMesh 库加载失败，请检查网络连接', 'error');
+    } else {
+      log('✅ FaceMesh 库已加载', 'success');
+      log('FaceMesh 类型：' + typeof FaceMesh);
+    }
+    
+    // 启动摄像头
+    startBtn.addEventListener('click', async () => {
+      try {
+        setStatus('正在启动摄像头...', '');
+        log('请求摄像头权限...');
+        
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'user'
+          }
+        });
+        
+        log('✅ 摄像头已启动', 'success');
+        video.srcObject = stream;
+        
+        await new Promise(resolve => {
+          video.onloadedmetadata = () => {
+            log('视频已加载：' + video.videoWidth + 'x' + video.videoHeight);
+            video.play();
+            resolve();
+          };
+        });
+        
+        startBtn.disabled = true;
+        detectBtn.disabled = false;
+        stopBtn.disabled = false;
+        setStatus('摄像头已启动，点击"开始检测"', 'success');
+        
+      } catch (error) {
+        log('❌ 摄像头启动失败：' + error.message, 'error');
+        setStatus('摄像头启动失败：' + error.message, 'error');
+      }
+    });
+    
+    // 初始化并检测
+    detectBtn.addEventListener('click', async () => {
+      try {
+        setStatus('正在初始化 FaceMesh...', '');
+        log('创建 FaceMesh 实例...');
+        
+        faceMesh = new FaceMesh({
+          locateFile: (file) => {
+            log('加载文件：' + file);
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+          }
+        });
+        
+        log('设置选项...');
+        faceMesh.setOptions({
+          maxNumFaces: 1,
+          refineLandmarks: false,
+          minDetectionConfidence: 0.3,
+          minTrackingConfidence: 0.3
+        });
+        
+        log('设置回调...');
+        faceMesh.onResults((results) => {
+          log('收到结果：' + JSON.stringify({
+            hasFace: results.multiFaceLandmarks?.length > 0,
+            count: results.multiFaceLandmarks?.length || 0
+          }));
+          
+          if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+            const landmarks = results.multiFaceLandmarks[0];
+            log(`✅ 检测到面部！468 个点`, 'success');
+            log(`可见点数：${landmarks.filter(lm => lm.visibility > 0.1).length}`);
+            
+            setStatus(`✅ 检测到面部！${landmarks.length} 个点`, 'success');
+            
+            // 绘制
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#0f0';
+            
+            // 画几个关键点
+            const keyPoints = [1, 10, 152, 234, 454, 288];
+            keyPoints.forEach(i => {
+              if (landmarks[i]) {
+                const x = landmarks[i].x * canvas.width;
+                const y = landmarks[i].y * canvas.height;
+                ctx.beginPath();
+                ctx.arc(x, y, 10, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            });
+            
+          } else {
+            log('⚠️ 未检测到面部');
+            setStatus('⚠️ 未检测到面部', 'warning');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+          }
+        });
+        
+        log('发送检测请求...');
+        setStatus('正在检测...', '');
+        
+        await faceMesh.send({ image: video });
+        
+        detectBtn.disabled = true;
+        isRunning = true;
+        
+      } catch (error) {
+        log('❌ 检测失败：' + error.message, 'error');
+        log('错误堆栈：' + error.stack);
+        setStatus('检测失败：' + error.message, 'error');
+      }
+    });
+    
+    // 停止
+    stopBtn.addEventListener('click', () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+      if (faceMesh) {
+        faceMesh = null;
+      }
+      video.srcObject = null;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      startBtn.disabled = false;
+      detectBtn.disabled = true;
+      stopBtn.disabled = true;
+      setStatus('已停止', '');
+      log('已停止');
+    });
+  </script>
+</body>
+</html>

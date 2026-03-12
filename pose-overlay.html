@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediaPipe 姿态骨架演示</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    h1 {
+      color: white;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .status {
+      color: #ffd700;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    
+    .container {
+      position: relative;
+      border-radius: 15px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    .video-wrapper {
+      position: relative;
+    }
+    
+    #videoInput {
+      display: block;
+      transform: scaleX(-1); /* 镜像翻转 */
+    }
+    
+    #canvasOutput {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      transform: scaleX(-1); /* 镜像翻转，与视频一致 */
+    }
+    
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+    }
+    
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    #startBtn {
+      background: #10b981;
+      color: white;
+    }
+    
+    #startBtn:hover {
+      background: #059669;
+    }
+    
+    #startBtn:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    
+    #stopBtn {
+      background: #ef4444;
+      color: white;
+    }
+    
+    #stopBtn:hover {
+      background: #dc2626;
+    }
+    
+    .info {
+      margin-top: 20px;
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      max-width: 640px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    .info h3 {
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+    
+    .info ul {
+      margin-left: 20px;
+      color: #4b5563;
+    }
+    
+    .info li {
+      margin: 5px 0;
+    }
+    
+    .fps-counter {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      color: #0f0;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 12px;
+      z-index: 10;
+    }
+    
+    .landmark-toggle {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    
+    .toggle-btn {
+      padding: 6px 12px;
+      font-size: 12px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    
+    .toggle-btn.active {
+      background: #059669;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎭 MediaPipe 姿态骨架演示</h1>
+  <div class="status" id="status">点击"启动摄像头"开始</div>
+  
+  <div class="container">
+    <div class="video-wrapper">
+      <video id="videoInput" playsinline width="640" height="480"></video>
+      <canvas id="canvasOutput" width="640" height="480"></canvas>
+      <div class="fps-counter" id="fpsCounter">FPS: 0</div>
+    </div>
+  </div>
+  
+  <div class="controls">
+    <button id="startBtn">🎬 启动摄像头</button>
+    <button id="stopBtn" disabled>⏹ 停止</button>
+  </div>
+  
+  <div class="landmark-toggle">
+    <button class="toggle-btn active" data-type="pose">🦴 身体骨架</button>
+    <button class="toggle-btn active" data-type="connections">🔗 连接线</button>
+  </div>
+  
+  <div class="info">
+    <h3>📖 使用说明</h3>
+    <ul>
+      <li>点击"启动摄像头"允许浏览器访问摄像头</li>
+      <li>站在摄像头前，确保全身在画面中</li>
+      <li>骨架会实时叠加在摄像头画面上</li>
+      <li>支持：<strong>身体骨架</strong>、<strong>面部网格</strong>、<strong>手部追踪</strong></li>
+      <li>点击上方按钮切换显示内容</li>
+    </ul>
+    <h3 style="margin-top: 15px;">🔧 技术栈</h3>
+    <ul>
+      <li><strong>MediaPipe Holistic</strong> - Google 的全身姿态识别（身体 + 面部 + 手部）</li>
+      <li><strong>Canvas 2D</strong> - 实时绘制骨架和关键点</li>
+    </ul>
+  </div>
+
+  <!-- 引入 MediaPipe Pose (使用 unpkg 源) -->
+  <script src="https://unpkg.com/@mediapipe/pose@0.5.0/pose.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@mediapipe/drawing_utils@0.3.0/drawing_utils.min.js" crossorigin="anonymous"></script>
+
+  <script>
+    // DOM 元素
+    const videoElement = document.getElementById('videoInput');
+    const canvasElement = document.getElementById('canvasOutput');
+    const canvasCtx = canvasElement.getContext('2d');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const statusElement = document.getElementById('status');
+    const fpsCounter = document.getElementById('fpsCounter');
+    const toggleBtns = document.querySelectorAll('.toggle-btn');
+    
+    let pose = null;
+    let isRunning = false;
+    let animationFrameId = null;
+    let mediaStream = null;
+    let frameCount = 0;
+    let lastFpsTime = performance.now();
+    
+    // 显示选项
+    const showOptions = {
+      pose: true,
+      connections: true
+    };
+
+    // FPS 计数器
+    function updateFps() {
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFpsTime >= 1000) {
+        fpsCounter.textContent = `FPS: ${frameCount}`;
+        frameCount = 0;
+        lastFpsTime = now;
+      }
+    }
+
+    // 绘制身体骨架（使用 MediaPipe 官方 drawing_utils）
+    function drawPoseLandmarks(landmarks) {
+      if (!landmarks || landmarks.length < 33) return;
+      
+      // 使用官方的绘制函数
+      if (showOptions.connections) {
+        // 绘制连接线
+        drawConnectors(canvasCtx, landmarks, POSE_CONNECTIONS, {
+          color: '#00FF00',
+          lineWidth: 4
+        });
+      }
+      
+      // 绘制关键点
+      drawLandmarks(canvasCtx, landmarks, {
+        color: '#FF0000',
+        lineWidth: 2,
+        radius: 6
+      });
+    }
+
+    // 处理每一帧
+    function processFrame() {
+      if (!isRunning || !pose) return;
+      
+      pose.send({ image: videoElement });
+      
+      animationFrameId = requestAnimationFrame(processFrame);
+    }
+
+    // 初始化 MediaPipe Pose
+    function initPose() {
+      console.log('🔧 初始化 MediaPipe Pose...');
+      
+      pose = new Pose({
+        locateFile: (file) => {
+          // 使用 unpkg 源
+          return `https://unpkg.com/@mediapipe/pose@0.5.0/${file}`;
+        }
+      });
+
+      pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        smoothSegmentation: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+
+      pose.onResults((results) => {
+        updateFps();
+        
+        // 清空画布
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        
+        // 绘制骨架
+        if (showOptions.pose && results.poseLandmarks) {
+          drawPoseLandmarks(results.poseLandmarks);
+        }
+      });
+      
+      console.log('✅ MediaPipe Pose 初始化完成');
+    }
+
+    // 启动摄像头
+    async function startCamera() {
+      try {
+        statusElement.textContent = '🔄 正在初始化...';
+        
+        // 检查浏览器支持
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('您的浏览器不支持摄像头访问。请使用 Chrome、Firefox 或 Edge 等现代浏览器。');
+        }
+        
+        // 检查是否是安全上下文
+        if (!window.isSecureContext) {
+          throw new Error('摄像头需要在安全上下文中运行（HTTPS 或 localhost）。请使用本地服务器访问。');
+        }
+        
+        // 初始化 Pose
+        if (!pose) {
+          initPose();
+        }
+        
+        // 获取摄像头
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'user'
+          },
+          audio: false
+        });
+        
+        // 设置视频源
+        videoElement.srcObject = mediaStream;
+        
+        // 等待视频加载
+        await new Promise((resolve) => {
+          videoElement.onloadedmetadata = () => {
+            videoElement.play();
+            resolve();
+          };
+        });
+        
+        // 开始处理
+        isRunning = true;
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        statusElement.textContent = '✅ 正在运行 - 请站在摄像头前';
+        
+        processFrame();
+        
+      } catch (error) {
+        console.error('启动失败:', error);
+        let errorMsg = error.message;
+        
+        if (error.name === 'NotAllowedError') {
+          errorMsg = '您拒绝了摄像头访问权限。请在浏览器设置中允许摄像头访问。';
+        } else if (error.name === 'NotFoundError') {
+          errorMsg = '未找到摄像头设备。请确保已连接摄像头。';
+        } else if (error.name === 'NotReadableError') {
+          errorMsg = '摄像头正在被其他程序使用。请关闭其他使用摄像头的程序。';
+        }
+        
+        statusElement.textContent = '❌ 启动失败：' + errorMsg;
+      }
+    }
+
+    // 停止摄像头
+    function stopCamera() {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+      }
+      
+      if (videoElement.srcObject) {
+        videoElement.srcObject = null;
+      }
+      
+      // 清空画布
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      
+      isRunning = false;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      statusElement.textContent = '⏹ 已停止';
+    }
+
+    // 切换显示选项
+    toggleBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const type = btn.dataset.type;
+        showOptions[type] = !showOptions[type];
+        btn.classList.toggle('active');
+      });
+    });
+
+    // 事件监听
+    startBtn.addEventListener('click', startCamera);
+    stopBtn.addEventListener('click', stopCamera);
+    
+    // ESC 键停止
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isRunning) {
+        stopCamera();
+      }
+    });
+
+    // 页面卸载时清理
+    window.addEventListener('beforeunload', () => {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    });
+  </script>
+</body>
+</html>

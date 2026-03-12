@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediaPipe Face Mesh - 轻量版</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    h1 { color: white; margin-bottom: 10px; }
+    .subtitle { color: #e0e7ff; margin-bottom: 20px; font-size: 14px; }
+    
+    .container {
+      position: relative;
+      border-radius: 15px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    video {
+      display: block;
+      transform: scaleX(-1);
+    }
+    
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform: scaleX(-1);
+    }
+    
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #10b981;
+      color: white;
+      font-weight: bold;
+    }
+    
+    button:disabled { background: #9ca3af; cursor: not-allowed; }
+    
+    #status {
+      color: #ffd700;
+      margin: 15px 0;
+      font-size: 14px;
+      text-align: center;
+      max-width: 640px;
+    }
+    
+    #fps {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      color: #0f0;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      z-index: 10;
+    }
+    
+    .info {
+      margin-top: 20px;
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      max-width: 640px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    .info h3 { color: #667eea; margin-bottom: 10px; }
+    .info ul { margin-left: 20px; color: #4b5563; }
+    .info li { margin: 5px 0; }
+    
+    .error-box {
+      background: #fee;
+      border: 2px solid #f44;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+      max-width: 640px;
+      display: none;
+    }
+    
+    .error-box h3 { color: #c00; margin-bottom: 10px; }
+    .error-box ul { margin-left: 20px; }
+  </style>
+</head>
+<body>
+  <h1>🎭 MediaPipe Face Mesh</h1>
+  <div class="subtitle">轻量优化版 - 降低内存占用</div>
+  <div id="status">点击"启动"开始</div>
+  
+  <div class="error-box" id="errorBox">
+    <h3>⚠️ 内存不足警告</h3>
+    <p>Face Mesh 需要较多内存，如果无法运行，请尝试：</p>
+    <ul>
+      <li>关闭其他浏览器标签页</li>
+      <li>使用 Chrome/Edge 浏览器</li>
+      <li>增加浏览器内存限制</li>
+      <li>使用性能更好的设备</li>
+    </ul>
+  </div>
+  
+  <div class="container">
+    <video id="video" width="640" height="480" playsinline></video>
+    <canvas id="canvas" width="640" height="480"></canvas>
+    <div id="fps">FPS: 0</div>
+  </div>
+  
+  <div class="controls">
+    <button id="startBtn">启动</button>
+    <button id="stopBtn" disabled>停止</button>
+  </div>
+  
+  <div class="info">
+    <h3>📖 说明</h3>
+    <ul>
+      <li>使用 MediaPipe FaceMesh 进行 468 点面部追踪</li>
+      <li>已优化内存占用，降低模型加载压力</li>
+      <li>需要摄像头权限</li>
+      <li>建议在 Chrome/Edge 浏览器中使用</li>
+    </ul>
+  </div>
+
+  <!-- MediaPipe FaceMesh -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const status = document.getElementById('status');
+    const fpsEl = document.getElementById('fps');
+    const errorBox = document.getElementById('errorBox');
+    
+    let faceMesh = null;
+    let isRunning = false;
+    let stream = null;
+    let frameCount = 0;
+    let lastTime = performance.now();
+    let errorCount = 0;
+
+    // FPS 计算
+    function updateFps() {
+      frameCount++;
+      const now = performance.now();
+      if (now - lastTime >= 1000) {
+        fpsEl.textContent = `FPS: ${frameCount}`;
+        frameCount = 0;
+        lastTime = now;
+      }
+    }
+
+    // 绘制面部特征
+    function drawFaceMesh(landmarks) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      if (!landmarks || landmarks.length < 468) {
+        status.textContent = `⚠️ 数据不完整 - ${landmarks ? landmarks.length : 0}/468`;
+        return;
+      }
+      
+      // FaceMesh 的 visibility 可能为 undefined，使用默认值 1.0
+      const visibleCount = landmarks.filter(lm => !lm.visibility || lm.visibility > 0.1).length;
+      
+      // 显示原始数据
+      console.log('Landmarks:', landmarks.length, 'Visible:', visibleCount);
+      console.log('Sample visibility:', landmarks.slice(0, 5).map(lm => lm.visibility));
+      
+      if (visibleCount < 10) {
+        status.textContent = `⚠️ 数据异常 - ${visibleCount}/468`;
+        return;
+      }
+      
+      status.textContent = `✅ 追踪中 - ${visibleCount}/468 个点`;
+      
+      // 定义关键连接（使用 MediaPipe 官方连接）
+      const connections = [
+        // 脸型轮廓（完整一圈）
+        [10, 338], [338, 297], [297, 332], [332, 284], [284, 251],
+        [251, 389], [389, 356], [356, 454], [454, 323], [323, 361],
+        [361, 288], [288, 397], [397, 365], [365, 379], [379, 378],
+        [378, 400], [400, 377], [377, 152], [152, 148], [148, 176],
+        [176, 149], [149, 150], [150, 136], [136, 172], [172, 58],
+        [58, 132], [132, 93], [93, 234], [234, 127], [127, 162],
+        [162, 21], [21, 54], [54, 103], [103, 67], [67, 109], [109, 10],
+        
+        // 嘴巴（外圈）
+        [61, 146], [146, 91], [91, 181], [181, 84], [84, 17],
+        [17, 314], [314, 405], [405, 321], [321, 375], [375, 291],
+        [291, 409], [409, 270], [270, 269], [269, 267], [267, 0],
+        [0, 37], [37, 39], [39, 40], [40, 185], [185, 61],
+        
+        // 嘴巴（内圈）
+        [78, 191], [191, 80], [80, 81], [81, 82], [82, 13],
+        [13, 312], [312, 311], [311, 310], [310, 415], [415, 308],
+        [308, 324], [324, 318], [318, 402], [402, 317], [317, 14],
+        [14, 87], [87, 178], [178, 88], [88, 95], [95, 78],
+        
+        // 鼻子
+        [1, 2], [2, 97], [97, 98], [98, 126], [126, 246],
+        [246, 197], [197, 195], [195, 6], [6, 197],
+        [4, 5], [5, 44], [44, 45], [45, 46], [46, 106],
+        [106, 122], [122, 123], [123, 114], [114, 4],
+        
+        // 左眼（上眼睑）
+        [33, 160], [160, 158], [158, 159], [159, 157], [157, 173], [173, 133],
+        // 左眼（下眼睑）
+        [33, 7], [7, 163], [163, 144], [144, 145], [145, 153], [153, 133],
+        
+        // 右眼（上眼睑）
+        [362, 385], [385, 387], [387, 388], [388, 466], [466, 263], [263, 362],
+        // 右眼（下眼睑）
+        [362, 382], [382, 381], [381, 380], [380, 374], [374, 373], [373, 362],
+        
+        // 左眉毛
+        [70, 63], [63, 105], [105, 66], [66, 107], [107, 55], [55, 65],
+        [65, 52], [52, 53], [53, 46],
+        
+        // 右眉毛
+        [300, 293], [293, 291], [291, 334], [334, 296], [296, 336], [336, 300]
+      ];
+      
+      // 绘制连接线
+      ctx.strokeStyle = '#00FF00';
+      ctx.lineWidth = 2;
+      
+      connections.forEach(([i, j]) => {
+        if (landmarks[i] && landmarks[j]) {
+          // FaceMesh 可能没有 visibility 字段，直接使用坐标
+          const p1 = {
+            x: landmarks[i].x * canvas.width,
+            y: landmarks[i].y * canvas.height
+          };
+          const p2 = {
+            x: landmarks[j].x * canvas.width,
+            y: landmarks[j].y * canvas.height
+          };
+          
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+        }
+      });
+      
+      // 绘制关键点
+      ctx.fillStyle = '#FF0000';
+      for (let i = 0; i < landmarks.length; i += 4) {
+        if (landmarks[i]) {
+          const x = landmarks[i].x * canvas.width;
+          const y = landmarks[i].y * canvas.height;
+          
+          ctx.beginPath();
+          ctx.arc(x, y, 2, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      }
+      
+      // 高亮关键点
+      const keyPoints = [33, 133, 362, 263, 61, 291, 1, 10, 152, 234];
+      ctx.fillStyle = '#FFFF00';
+      keyPoints.forEach(i => {
+        if (landmarks[i] && landmarks[i].visibility > 0.3) {
+          const x = landmarks[i].x * canvas.width;
+          const y = landmarks[i].y * canvas.height;
+          
+          ctx.beginPath();
+          ctx.arc(x, y, 5, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      });
+    }
+
+    // 初始化 FaceMesh
+    async function initFaceMesh() {
+      status.textContent = '🔄 正在加载模型（约 10-20 秒）...';
+      console.log('Loading FaceMesh...');
+      
+      try {
+        faceMesh = new FaceMesh({
+          locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+          }
+        });
+
+        faceMesh.setOptions({
+          maxNumFaces: 1,
+          refineLandmarks: false, // 关闭虹膜追踪，降低内存
+          minDetectionConfidence: 0.3, // 降低检测阈值
+          minTrackingConfidence: 0.3  // 降低追踪阈值
+        });
+
+        faceMesh.onResults((results) => {
+          updateFps();
+          
+          console.log('Results:', {
+            hasFace: results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0,
+            faceCount: results.multiFaceLandmarks?.length || 0
+          });
+          
+          if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+            drawFaceMesh(results.multiFaceLandmarks[0]);
+          } else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            status.textContent = '🔍 检测中... 请确保面部在画面中央，光线充足';
+          }
+        });
+        
+        console.log('FaceMesh initialized');
+        return true;
+        
+      } catch (error) {
+        console.error('FaceMesh init error:', error);
+        status.textContent = '❌ 模型加载失败：' + error.message;
+        errorBox.style.display = 'block';
+        return false;
+      }
+    }
+
+    // 启动
+    async function start() {
+      try {
+        status.textContent = '🔄 正在启动...';
+        
+        if (typeof FaceMesh === 'undefined') {
+          throw new Error('FaceMesh 库未加载，请检查网络连接或刷新页面');
+        }
+        
+        if (!faceMesh) {
+          const success = await initFaceMesh();
+          if (!success) return;
+        }
+        
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480 }
+        });
+        
+        video.srcObject = stream;
+        await new Promise(resolve => {
+          video.onloadedmetadata = () => {
+            video.play();
+            resolve();
+          };
+        });
+        
+        isRunning = true;
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        status.textContent = '✅ 运行中 - 请面对摄像头';
+        
+        processFrame();
+        
+      } catch (error) {
+        console.error('Start error:', error);
+        status.textContent = '❌ 错误：' + error.message;
+        
+        if (error.message.includes('memory') || error.message.includes('Wasm')) {
+          errorBox.style.display = 'block';
+        }
+      }
+    }
+
+    // 处理帧
+    async function processFrame() {
+      if (!isRunning) return;
+      
+      try {
+        await faceMesh.send({ image: video });
+      } catch (e) {
+        console.error('Frame error:', e);
+        errorCount++;
+        
+        if (errorCount > 5) {
+          status.textContent = '⚠️ 处理错误过多，请刷新页面重试';
+          errorBox.style.display = 'block';
+          return;
+        }
+      }
+      
+      requestAnimationFrame(processFrame);
+    }
+
+    // 停止
+    function stop() {
+      isRunning = false;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+      video.srcObject = null;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      status.textContent = '已停止';
+    }
+
+    startBtn.addEventListener('click', start);
+    stopBtn.addEventListener('click', stop);
+    
+    // 页面加载时检查库
+    window.addEventListener('load', () => {
+      console.log('FaceMesh available:', typeof FaceMesh);
+      if (typeof FaceMesh === 'undefined') {
+        status.textContent = '⚠️ 库加载失败，请检查网络连接或刷新页面';
+      }
+    });
+  </script>
+</body>
+</html>

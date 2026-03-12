@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kalidokit + SVG 动作捕捉演示</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    h1 {
+      color: white;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .status {
+      color: #ffd700;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    
+    .container {
+      display: flex;
+      gap: 30px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 1200px;
+    }
+    
+    .panel {
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    .video-panel {
+      position: relative;
+    }
+    
+    #videoInput {
+      width: 640px;
+      height: 480px;
+      border-radius: 10px;
+      background: #000;
+      transform: scaleX(-1); /* 镜像翻转 */
+    }
+    
+    .svg-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    #character {
+      width: 400px;
+      height: 600px;
+      background: linear-gradient(to bottom, #f0f9ff, #e0f2fe);
+      border-radius: 10px;
+      border: 3px solid #667eea;
+    }
+    
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+    }
+    
+    button {
+      padding: 10px 20px;
+      font-size: 14px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    #startBtn {
+      background: #10b981;
+      color: white;
+    }
+    
+    #startBtn:hover {
+      background: #059669;
+    }
+    
+    #startBtn:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    
+    .info {
+      margin-top: 20px;
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      max-width: 1000px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    .info h3 {
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+    
+    .info ul {
+      margin-left: 20px;
+      color: #4b5563;
+    }
+    
+    .info li {
+      margin: 5px 0;
+    }
+    
+    .fps-counter {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      color: #0f0;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎭 Kalidokit + SVG 动作捕捉</h1>
+  <div class="status" id="status">点击"启动摄像头"开始</div>
+  
+  <div class="container">
+    <!-- 视频面板 -->
+    <div class="panel video-panel">
+      <video id="videoInput" playsinline></video>
+      <div class="fps-counter" id="fpsCounter">FPS: 0</div>
+    </div>
+    
+    <!-- SVG 面板 -->
+    <div class="panel svg-panel">
+      <svg id="character" viewBox="0 0 400 600" xmlns="http://www.w3.org/2000/svg">
+        <!-- 定义渐变 -->
+        <defs>
+          <linearGradient id="skinGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#ffdbac;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#f1c27d;stop-opacity:1" />
+          </linearGradient>
+          <linearGradient id="shirtGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        
+        <!-- 根节点 -->
+        <g id="root">
+          <!-- 头部组 -->
+          <g id="Head" transform-origin="200 100">
+            <!-- 头发 -->
+            <ellipse cx="200" cy="85" rx="55" ry="40" fill="#2d3748"/>
+            <!-- 脸 -->
+            <ellipse cx="200" cy="100" rx="45" ry="50" fill="url(#skinGradient)"/>
+            <!-- 眼睛 -->
+            <g id="LeftEye">
+              <ellipse cx="185" cy="95" rx="8" ry="10" fill="white"/>
+              <circle id="LeftPupil" cx="185" cy="95" r="4" fill="#2d3748"/>
+            </g>
+            <g id="RightEye">
+              <ellipse cx="215" cy="95" rx="8" ry="10" fill="white"/>
+              <circle id="RightPupil" cx="215" cy="95" r="4" fill="#2d3748"/>
+            </g>
+            <!-- 嘴巴 -->
+            <path id="Mouth" d="M 185 120 Q 200 130 215 120" stroke="#e53e3e" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <!-- 眉毛 -->
+            <path id="LeftBrow" d="M 175 85 Q 185 80 195 85" stroke="#2d3748" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <path id="RightBrow" d="M 205 85 Q 215 80 225 85" stroke="#2d3748" stroke-width="2" fill="none" stroke-linecap="round"/>
+          </g>
+          
+          <!-- 脖子 -->
+          <rect x="190" y="145" width="20" height="15" fill="url(#skinGradient)"/>
+          
+          <!-- 脊柱/身体 -->
+          <g id="Spine" transform-origin="200 170">
+            <!-- 躯干 -->
+            <path d="M 170 160 L 230 160 L 240 280 L 160 280 Z" fill="url(#shirtGradient)"/>
+          </g>
+          
+          <!-- 左臂 -->
+          <g id="LeftArm" transform-origin="170 170">
+            <rect x="130" y="165" width="45" height="120" rx="20" fill="url(#shirtGradient)"/>
+            <!-- 左手 -->
+            <circle cx="135" cy="290" r="15" fill="url(#skinGradient)"/>
+          </g>
+          
+          <!-- 右臂 -->
+          <g id="RightArm" transform-origin="230 170">
+            <rect x="225" y="165" width="45" height="120" rx="20" fill="url(#shirtGradient)"/>
+            <!-- 右手 -->
+            <circle cx="265" cy="290" r="15" fill="url(#skinGradient)"/>
+          </g>
+          
+          <!-- 左腿 -->
+          <g id="LeftLeg" transform-origin="180 280">
+            <rect x="165" y="280" width="35" height="140" rx="15" fill="#4a5568"/>
+          </g>
+          
+          <!-- 右腿 -->
+          <g id="RightLeg" transform-origin="220 280">
+            <rect x="200" y="280" width="35" height="140" rx="15" fill="#4a5568"/>
+          </g>
+        </g>
+      </svg>
+      
+      <div class="controls">
+        <button id="startBtn">🎬 启动摄像头</button>
+        <button id="stopBtn" disabled>⏹ 停止</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="info">
+    <h3>📖 使用说明</h3>
+    <ul>
+      <li>点击"启动摄像头"允许浏览器访问摄像头</li>
+      <li>站在摄像头前，确保上半身在画面中</li>
+      <li>挥动手臂、转动头部，SVG 角色会跟随你的动作！</li>
+      <li>支持：头部旋转、手臂抬起、身体倾斜</li>
+      <li>按 <code>ESC</code> 或点击"停止"结束</li>
+    </ul>
+    <h3 style="margin-top: 15px;">🔧 技术栈</h3>
+    <ul>
+      <li><strong>MediaPipe Pose</strong> - Google 的姿态识别</li>
+      <li><strong>Kalidokit</strong> - VTuber 风格的 rigging 解决方案</li>
+      <li><strong>SVG</strong> - 可缩放矢量图形，通过 transform 驱动</li>
+    </ul>
+  </div>
+
+  <!-- 引入必要的库 -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
+
+  <script>
+    // DOM 元素
+    const videoElement = document.getElementById('videoInput');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const statusElement = document.getElementById('status');
+    const fpsCounter = document.getElementById('fpsCounter');
+    
+    // SVG 元素
+    const svgElements = {
+      Head: document.getElementById('Head'),
+      Spine: document.getElementById('Spine'),
+      LeftArm: document.getElementById('LeftArm'),
+      RightArm: document.getElementById('RightArm'),
+      LeftLeg: document.getElementById('LeftLeg'),
+      RightLeg: document.getElementById('RightLeg'),
+      LeftEye: document.getElementById('LeftEye'),
+      RightEye: document.getElementById('RightEye'),
+      LeftPupil: document.getElementById('LeftPupil'),
+      RightPupil: document.getElementById('RightPupil'),
+      Mouth: document.getElementById('Mouth'),
+      LeftBrow: document.getElementById('LeftBrow'),
+      RightBrow: document.getElementById('RightBrow')
+    };
+    
+    let pose = null;
+    let isRunning = false;
+    let animationFrameId = null;
+    let frameCount = 0;
+    let lastFpsTime = performance.now();
+    let mediaStream = null;
+
+    // FPS 计数器
+    function updateFps() {
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFpsTime >= 1000) {
+        fpsCounter.textContent = `FPS: ${frameCount}`;
+        frameCount = 0;
+        lastFpsTime = now;
+      }
+    }
+
+    // 计算两点之间的角度
+    function calculateAngle(point1, point2, point3) {
+      // 计算向量
+      const vector1 = { x: point1.x - point2.x, y: point1.y - point2.y };
+      const vector2 = { x: point3.x - point2.x, y: point3.y - point2.y };
+      
+      // 计算角度（弧度）
+      const angle = Math.atan2(vector2.y, vector2.x) - Math.atan2(vector1.y, vector1.x);
+      return angle * (180 / Math.PI); // 转换为角度
+    }
+
+    // 将动作数据应用到 SVG（直接使用 MediaPipe 原始数据）
+    function applyPoseToSVG(landmarks) {
+      if (!landmarks || landmarks.length < 33) return;
+      
+      // 定义关键点索引
+      const NOSE = 0;
+      const LEFT_SHOULDER = 11;
+      const RIGHT_SHOULDER = 12;
+      const LEFT_ELBOW = 13;
+      const RIGHT_ELBOW = 14;
+      const LEFT_WRIST = 15;
+      const RIGHT_WRIST = 16;
+      const LEFT_HIP = 23;
+      const RIGHT_HIP = 24;
+      const LEFT_KNEE = 25;
+      const RIGHT_KNEE = 26;
+      
+      // 检查关键点可见性
+      function isVisible(index) {
+        return landmarks[index] && landmarks[index].visibility > 0.3;
+      }
+      
+      // 调试：输出关键点坐标
+      if (isVisible(LEFT_SHOULDER) && isVisible(LEFT_ELBOW)) {
+        console.log('📍 左肩膀:', landmarks[LEFT_SHOULDER].x.toFixed(3), landmarks[LEFT_SHOULDER].y.toFixed(3));
+        console.log('📍 左手肘:', landmarks[LEFT_ELBOW].x.toFixed(3), landmarks[LEFT_ELBOW].y.toFixed(3));
+      }
+      
+      // 头部旋转（基于肩膀倾斜）
+      if (svgElements.Head && isVisible(LEFT_SHOULDER) && isVisible(RIGHT_SHOULDER)) {
+        const leftShoulder = landmarks[LEFT_SHOULDER];
+        const rightShoulder = landmarks[RIGHT_SHOULDER];
+        const nose = landmarks[NOSE];
+        
+        // 计算肩膀倾斜角度
+        const shoulderAngle = Math.atan2(
+          rightShoulder.y - leftShoulder.y,
+          rightShoulder.x - leftShoulder.x
+        ) * (180 / Math.PI);
+        
+        // 计算头部左右转动（基于鼻子相对于肩膀中心的位置）
+        const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
+        const headTurn = (nose.x - shoulderCenterX) * 2;
+        
+        svgElements.Head.setAttribute('transform', 
+          `rotate(${shoulderAngle}, 200, 100) rotate(${headTurn * 0.5}, 200, 100)`
+        );
+      }
+      
+      // 脊柱旋转（基于肩膀和臀部的相对位置）
+      if (svgElements.Spine && isVisible(LEFT_SHOULDER) && isVisible(LEFT_HIP)) {
+        const leftShoulder = landmarks[LEFT_SHOULDER];
+        const leftHip = landmarks[LEFT_HIP];
+        
+        const spineAngle = Math.atan2(
+          leftHip.x - leftShoulder.x,
+          leftHip.y - leftShoulder.y
+        ) * (180 / Math.PI) - 90;
+        
+        svgElements.Spine.setAttribute('transform', 
+          `rotate(${spineAngle * 0.5}, 200, 170)`
+        );
+      }
+      
+      // 左臂旋转
+      if (svgElements.LeftArm && isVisible(LEFT_SHOULDER) && isVisible(LEFT_ELBOW)) {
+        const shoulder = landmarks[LEFT_SHOULDER];
+        const elbow = landmarks[LEFT_ELBOW];
+        
+        // 计算手臂角度
+        const armAngle = Math.atan2(
+          elbow.y - shoulder.y,
+          elbow.x - shoulder.x
+        ) * (180 / Math.PI);
+        
+        // 转换为 SVG 旋转（从垂直向下开始）
+        const rotation = armAngle - 90;
+        
+        svgElements.LeftArm.setAttribute('transform', 
+          `rotate(${rotation}, 170, 170)`
+        );
+      }
+      
+      // 右臂旋转
+      if (svgElements.RightArm && isVisible(RIGHT_SHOULDER) && isVisible(RIGHT_ELBOW)) {
+        const shoulder = landmarks[RIGHT_SHOULDER];
+        const elbow = landmarks[RIGHT_ELBOW];
+        
+        const armAngle = Math.atan2(
+          elbow.y - shoulder.y,
+          elbow.x - shoulder.x
+        ) * (180 / Math.PI);
+        
+        const rotation = armAngle - 90;
+        
+        svgElements.RightArm.setAttribute('transform', 
+          `rotate(${rotation}, 230, 170)`
+        );
+      }
+      
+      // 左腿旋转
+      if (svgElements.LeftLeg && isVisible(LEFT_HIP) && isVisible(LEFT_KNEE)) {
+        const hip = landmarks[LEFT_HIP];
+        const knee = landmarks[LEFT_KNEE];
+        
+        const legAngle = Math.atan2(
+          knee.y - hip.y,
+          knee.x - hip.x
+        ) * (180 / Math.PI);
+        
+        const rotation = legAngle - 90;
+        
+        svgElements.LeftLeg.setAttribute('transform', 
+          `rotate(${rotation * 0.5}, 180, 280)`
+        );
+      }
+      
+      // 右腿旋转
+      if (svgElements.RightLeg && isVisible(RIGHT_HIP) && isVisible(RIGHT_KNEE)) {
+        const hip = landmarks[RIGHT_HIP];
+        const knee = landmarks[RIGHT_KNEE];
+        
+        const legAngle = Math.atan2(
+          knee.y - hip.y,
+          knee.x - hip.x
+        ) * (180 / Math.PI);
+        
+        const rotation = legAngle - 90;
+        
+        svgElements.RightLeg.setAttribute('transform', 
+          `rotate(${rotation * 0.5}, 220, 280)`
+        );
+      }
+      
+      // 眼睛跟随（基于鼻子位置）
+      if (svgElements.LeftPupil && svgElements.RightPupil && isVisible(NOSE)) {
+        const nose = landmarks[NOSE];
+        const eyeX = (nose.x - 0.5) * 10; // 归一化到 -0.5~0.5 范围
+        const eyeY = (nose.y - 0.5) * 10;
+        
+        svgElements.LeftPupil.setAttribute('cx', 185 + eyeX);
+        svgElements.LeftPupil.setAttribute('cy', 95 + eyeY);
+        svgElements.RightPupil.setAttribute('cx', 215 + eyeX);
+        svgElements.RightPupil.setAttribute('cy', 95 + eyeY);
+      }
+      
+      // 嘴巴微笑（简化版，基于嘴巴张开程度）
+      if (svgElements.Mouth && landmarks[0]) {
+        // 这里可以添加嘴巴检测逻辑
+        // 暂时保持默认
+      }
+    }
+
+    // 初始化 MediaPipe Pose
+    function initPose() {
+      console.log('🔧 初始化 MediaPipe Pose...');
+      
+      pose = new Pose({
+        locateFile: (file) => {
+          return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+        }
+      });
+
+      pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        smoothSegmentation: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+      
+      console.log('✅ MediaPipe Pose 初始化完成');
+
+      pose.onResults((results) => {
+        updateFps();
+        
+        try {
+          if (results.poseLandmarks && results.poseLandmarks.length >= 33) {
+            // 直接应用原始 landmarks 数据
+            applyPoseToSVG(results.poseLandmarks);
+          }
+        } catch (error) {
+          console.warn('姿态处理失败:', error);
+        }
+      });
+    }
+
+    // 处理视频帧
+    async function processFrame() {
+      if (!isRunning || !pose) return;
+      
+      try {
+        await pose.send({ image: videoElement });
+      } catch (error) {
+        console.error('处理帧失败:', error);
+      }
+      
+      animationFrameId = requestAnimationFrame(processFrame);
+    }
+
+    // 启动摄像头
+    async function startCamera() {
+      try {
+        statusElement.textContent = '🔄 正在初始化...';
+        
+        // 调试信息
+        console.log('🔍 诊断信息:');
+        console.log('  - URL 协议:', window.location.protocol);
+        console.log('  - 是否安全上下文:', window.isSecureContext);
+        console.log('  - navigator.mediaDevices:', navigator.mediaDevices);
+        console.log('  - getUserMedia:', navigator.mediaDevices?.getUserMedia);
+        
+        // 检查是否是安全上下文（HTTPS 或 localhost）
+        if (!window.isSecureContext) {
+          throw new Error('❌ 安全上下文检查失败\n\n摄像头只能在以下环境使用：\n• http://localhost:端口\n• http://127.0.0.1:端口\n• https://开头的网站\n\n你现在使用的是 ' + window.location.protocol + ' 协议，请使用本地服务器启动。\n\n👉 解决方法：\n1. 打开终端\n2. cd /home/wuzaiyuan/.openclaw/workspace/kalidokit-svg-demo\n3. python3 -m http.server 8080\n4. 浏览器访问 http://localhost:8080');
+        }
+        
+        // 检查浏览器支持
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('您的浏览器不支持摄像头访问。请使用 Chrome、Firefox 或 Edge 等现代浏览器。');
+        }
+        
+        // 初始化 Pose
+        if (!pose) {
+          initPose();
+        }
+        
+        // 使用原生 getUserMedia 获取摄像头
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'user'
+          },
+          audio: false
+        });
+        
+        // 设置视频源
+        videoElement.srcObject = mediaStream;
+        
+        // 等待视频加载完成
+        await new Promise((resolve) => {
+          videoElement.onloadedmetadata = () => {
+            videoElement.play();
+            resolve();
+          };
+        });
+        
+        // 开始处理帧
+        isRunning = true;
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        statusElement.textContent = '✅ 正在运行 - 请站在摄像头前并挥动手臂';
+        
+        // 启动帧处理循环
+        processFrame();
+        
+      } catch (error) {
+        console.error('启动失败:', error);
+        let errorMsg = error.message;
+        
+        if (error.name === 'NotAllowedError') {
+          errorMsg = '您拒绝了摄像头访问权限。请在浏览器设置中允许摄像头访问，然后重试。';
+        } else if (error.name === 'NotFoundError') {
+          errorMsg = '未找到摄像头设备。请确保已连接摄像头。';
+        } else if (error.name === 'NotReadableError') {
+          errorMsg = '摄像头正在被其他程序使用。请关闭其他使用摄像头的程序后重试。';
+        }
+        
+        statusElement.textContent = '❌ 启动失败：' + errorMsg;
+      }
+    }
+
+    // 停止摄像头
+    function stopCamera() {
+      // 取消动画帧
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      
+      // 停止媒体流
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+      }
+      
+      // 清空视频源
+      if (videoElement.srcObject) {
+        videoElement.srcObject = null;
+      }
+      
+      isRunning = false;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      statusElement.textContent = '⏹ 已停止';
+      
+      // 重置 SVG 位置
+      Object.values(svgElements).forEach(el => {
+        if (el) el.setAttribute('transform', '');
+      });
+    }
+
+    // 事件监听
+    startBtn.addEventListener('click', startCamera);
+    stopBtn.addEventListener('click', stopCamera);
+    
+    // ESC 键停止
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isRunning) {
+        stopCamera();
+      }
+    });
+
+    // 页面卸载时清理
+    window.addEventListener('beforeunload', () => {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    });
+  </script>
+</body>
+</html>

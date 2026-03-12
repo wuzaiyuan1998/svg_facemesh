@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>姿态识别 - Google CDN 版</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #1a1a2e;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    h1 { color: #fff; margin-bottom: 20px; }
+    
+    .video-container {
+      position: relative;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 0 20px rgba(0,255,255,0.3);
+    }
+    
+    video {
+      display: block;
+      transform: scaleX(-1);
+    }
+    
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform: scaleX(-1);
+    }
+    
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+    }
+    
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #00d4aa;
+      color: #000;
+      font-weight: bold;
+    }
+    
+    button:disabled { background: #666; cursor: not-allowed; }
+    
+    #status {
+      color: #00d4aa;
+      margin: 10px 0;
+      font-size: 14px;
+    }
+    
+    #fps {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      color: #0f0;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎭 姿态识别演示 (Google CDN)</h1>
+  <div id="status">点击按钮启动摄像头</div>
+  
+  <div class="video-container">
+    <video id="video" width="640" height="480" playsinline></video>
+    <canvas id="canvas" width="640" height="480"></canvas>
+    <div id="fps">FPS: 0</div>
+  </div>
+  
+  <div class="controls">
+    <button id="startBtn">启动</button>
+    <button id="stopBtn" disabled>停止</button>
+  </div>
+
+  <!-- MediaPipe Pose from Google CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+  
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const status = document.getElementById('status');
+    const fpsEl = document.getElementById('fps');
+    
+    let pose = null;
+    let isRunning = false;
+    let stream = null;
+    let frameCount = 0;
+    let lastTime = performance.now();
+
+    // 检查库是否加载
+    console.log('Pose available:', typeof Pose);
+    console.log('POSE_CONNECTIONS available:', typeof POSE_CONNECTIONS);
+
+    // 自定义骨架连接（更高密度）
+    const DENSE_POSE_CONNECTIONS = [
+      // 面部轮廓
+      [10, 338], [338, 297], [297, 332], [332, 284], [284, 251],
+      [10, 151], [151, 98], [98, 171], [171, 6], [6, 197], [197, 195],
+      [10, 151], [151, 169], [169, 170], [170, 140], [140, 270], [270, 269],
+      [10, 338], [338, 297], [297, 332], [332, 284], [284, 251],
+      
+      // 鼻子
+      [1, 2], [2, 3], [3, 4],
+      
+      // 嘴巴
+      [61, 146], [146, 91], [91, 181], [181, 84], [84, 17],
+      [17, 314], [314, 405], [405, 321], [321, 375], [375, 291],
+      [61, 185], [185, 40], [40, 39], [39, 37], [37, 0], [0, 267],
+      [267, 269], [269, 270], [270, 409], [409, 291],
+      
+      // 眼睛
+      [33, 160], [160, 158], [158, 159], [159, 157], [157, 173], [173, 133],
+      [362, 385], [385, 387], [387, 388], [388, 466], [466, 263], [263, 362],
+      
+      // 眉毛
+      [70, 63], [63, 105], [105, 66], [66, 107],
+      [300, 293], [293, 334], [334, 296], [296, 336],
+      
+      // 身体主干
+      [11, 12],  // 肩膀
+      [23, 24],  // 臀部
+      [11, 23], [12, 24],  // 躯干两侧
+      [23, 25], [25, 27], [27, 29],  // 左腿
+      [24, 26], [26, 28], [28, 30],  // 右腿
+      
+      // 手臂（包含更多细节）
+      [11, 13], [13, 15], [15, 17], [17, 19], [19, 21],  // 左臂完整
+      [12, 14], [14, 16], [16, 18], [18, 20], [20, 22],  // 右臂完整
+      
+      // 肩膀到躯干
+      [11, 23], [12, 24],
+      
+      // 颈部
+      [11, 12], [12, 1], [1, 11],
+    ];
+    
+    // 内联绘制函数（不依赖 drawingUtils）
+    function drawConnectors(ctx, landmarks, connections, style) {
+      ctx.strokeStyle = style.color || '#00FF00';
+      ctx.lineWidth = style.lineWidth || 2;
+      
+      connections.forEach(([i, j]) => {
+        if (landmarks[i] && landmarks[j] && 
+            landmarks[i].visibility > 0.3 && landmarks[j].visibility > 0.3) {
+          const p1 = {
+            x: landmarks[i].x * ctx.canvas.width,
+            y: landmarks[i].y * ctx.canvas.height
+          };
+          const p2 = {
+            x: landmarks[j].x * ctx.canvas.width,
+            y: landmarks[j].y * ctx.canvas.height
+          };
+          
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+        }
+      });
+    }
+
+    function drawLandmarks(ctx, landmarks, style) {
+      ctx.fillStyle = style.color || '#FF0000';
+      ctx.lineWidth = style.lineWidth || 1;
+      const radius = style.radius || 3;
+      
+      landmarks.forEach((landmark, i) => {
+        if (landmark.visibility > 0.3) {
+          const x = landmark.x * ctx.canvas.width;
+          const y = landmark.y * ctx.canvas.height;
+          
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      });
+    }
+
+    function updateFps() {
+      frameCount++;
+      const now = performance.now();
+      if (now - lastTime >= 1000) {
+        fpsEl.textContent = `FPS: ${frameCount}`;
+        frameCount = 0;
+        lastTime = now;
+      }
+    }
+
+    async function initPose() {
+      status.textContent = '正在初始化...';
+      
+      pose = new Pose({
+        locateFile: (file) => {
+          return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+        }
+      });
+
+      pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+
+      pose.onResults((results) => {
+        updateFps();
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (results.poseLandmarks) {
+          // 绘制高密度骨架（绿色）
+          drawConnectors(
+            ctx,
+            results.poseLandmarks,
+            DENSE_POSE_CONNECTIONS,
+            { color: '#00FF00', lineWidth: 2 }
+          );
+          
+          // 绘制身体主干（蓝色，加粗）
+          drawConnectors(
+            ctx,
+            results.poseLandmarks,
+            POSE_CONNECTIONS,
+            { color: '#00BFFF', lineWidth: 4 }
+          );
+          
+          // 绘制所有关键点（红色）
+          drawLandmarks(
+            ctx,
+            results.poseLandmarks,
+            { color: '#FF0000', lineWidth: 2, radius: 4 }
+          );
+          
+          // 高亮关键点（白色）
+          const keyPoints = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+          keyPoints.forEach(i => {
+            if (results.poseLandmarks[i] && results.poseLandmarks[i].visibility > 0.3) {
+              const x = results.poseLandmarks[i].x * canvas.width;
+              const y = results.poseLandmarks[i].y * canvas.height;
+              ctx.fillStyle = '#FFFFFF';
+              ctx.beginPath();
+              ctx.arc(x, y, 6, 0, 2 * Math.PI);
+              ctx.fill();
+            }
+          });
+        }
+      });
+    }
+
+    async function start() {
+      try {
+        console.log('Starting...');
+        
+        if (typeof Pose === 'undefined') {
+          throw new Error('MediaPipe Pose 库未加载！请检查网络连接，或尝试刷新页面。');
+        }
+        
+        if (!pose) {
+          await initPose();
+        }
+        
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480 }
+        });
+        
+        video.srcObject = stream;
+        await new Promise(resolve => {
+          video.onloadedmetadata = () => {
+            video.play();
+            resolve();
+          };
+        });
+        
+        isRunning = true;
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        status.textContent = '✅ 运行中 - 在摄像头前移动';
+        
+        processFrame();
+        
+      } catch (error) {
+        console.error('Start error:', error);
+        status.textContent = '❌ 错误：' + error.message;
+      }
+    }
+
+    async function processFrame() {
+      if (!isRunning) return;
+      
+      try {
+        await pose.send({ image: video });
+      } catch (e) {
+        console.error('Frame error:', e);
+      }
+      
+      requestAnimationFrame(processFrame);
+    }
+
+    function stop() {
+      isRunning = false;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+      video.srcObject = null;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      status.textContent = '已停止';
+    }
+
+    startBtn.addEventListener('click', start);
+    stopBtn.addEventListener('click', stop);
+  </script>
+</body>
+</html>

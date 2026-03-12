@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>六角恐龙 - FaceMesh 表情捕捉（离线版）</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h1 { color: white; margin-bottom: 10px; }
+    .subtitle { color: #e0e7ff; margin-bottom: 20px; font-size: 14px; }
+    .container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 1400px;
+    }
+    .video-panel, .svg-panel {
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    .video-panel { position: relative; }
+    video {
+      display: block;
+      transform: scaleX(-1);
+      border-radius: 10px;
+    }
+    canvas {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      transform: scaleX(-1);
+      pointer-events: none;
+    }
+    #character {
+      width: 500px;
+      height: 500px;
+      background: linear-gradient(to bottom, #f0f9ff, #e0f2fe);
+      border-radius: 10px;
+    }
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #10b981;
+      color: white;
+      font-weight: bold;
+    }
+    button:disabled { background: #9ca3af; cursor: not-allowed; }
+    #status {
+      color: #ffd700;
+      margin: 15px 0;
+      font-size: 14px;
+      text-align: center;
+    }
+    #fps {
+      position: absolute;
+      top: 30px;
+      left: 30px;
+      background: rgba(0,0,0,0.7);
+      color: #0f0;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      z-index: 10;
+    }
+    .info {
+      margin-top: 20px;
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      max-width: 800px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    .info h3 { color: #667eea; margin-bottom: 10px; }
+    .info ul { margin-left: 20px; color: #4b5563; }
+    .notice {
+      background: #fff3cd;
+      border: 2px solid #ffc107;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+      max-width: 800px;
+    }
+    .notice h4 { color: #856404; margin-bottom: 10px; }
+    .notice ul { margin-left: 20px; color: #856404; }
+  </style>
+</head>
+<body>
+  <h1>🦎 六角恐龙 - FaceMesh 表情捕捉</h1>
+  <div class="subtitle">离线版 - 无需联网即可运行</div>
+  <div id="status">点击"启动"开始</div>
+  
+  <div class="notice">
+    <h4>📦 离线版说明</h4>
+    <ul>
+      <li>首次运行需要联网加载 MediaPipe 模型（约 5MB）</li>
+      <li>加载完成后，刷新页面即可离线使用</li>
+      <li>模型文件会自动缓存到浏览器</li>
+      <li>如需完全离线，请查看打包说明文档</li>
+    </ul>
+  </div>
+  
+  <div class="container">
+    <div class="video-panel">
+      <video id="video" width="640" height="480" playsinline></video>
+      <canvas id="canvas" width="640" height="480"></canvas>
+      <div id="fps">FPS: 0</div>
+    </div>
+    
+    <div class="svg-panel">
+      <svg id="character" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="eyeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#4CC9F0"/>
+            <stop offset="100%" stop-color="#4CAF50"/>
+          </linearGradient>
+          <linearGradient id="bubbleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+            <stop offset="100%" stop-color="#e0f7fa" stop-opacity="0.7"/>
+          </linearGradient>
+        </defs>
+
+        <path id="tail" d="M140 340 Q90 450 140 560 Q200 660 310 610 L330 510 Z" 
+              fill="#FFF9E6" stroke="#000" stroke-width="18"/>
+        <path d="M155 375 L225 415" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+        <path d="M165 415 L235 455" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+        <path d="M175 455 L245 495" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+        <path d="M185 495 L255 535" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+        <path d="M195 535 L265 575" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+        <path d="M215 475 L305 495" stroke="#FF5A5F" stroke-width="14" stroke-linecap="round"/>
+
+        <path d="M320 190 Q400 110 570 190 Q650 270 670 400 Q650 530 590 610 Q530 660 420 670 Q320 660 260 610 Q220 560 220 510 L330 510 Q330 410 320 190 Z" 
+              fill="#FFD166" stroke="#000" stroke-width="18"/>
+        <path d="M400 470 Q500 490 600 470 Q580 610 520 650 Q420 660 320 650 Q280 610 400 470 Z" 
+              fill="#FFB3C1"/>
+
+        <g id="gill-left" fill="#FF5A5F" stroke="#000" stroke-width="14">
+          <path d="M320 210 Q270 170 290 130 Q330 170 320 210 Z"/>
+          <path d="M310 250 Q250 230 270 190 Q310 230 310 250 Z"/>
+          <path d="M300 290 Q250 280 270 250 Q310 280 300 290 Z"/>
+        </g>
+        <g id="gill-right" fill="#FF5A5F" stroke="#000" stroke-width="14">
+          <path d="M560 210 Q610 170 590 130 Q550 170 560 210 Z"/>
+          <path d="M570 250 Q630 230 610 190 Q570 230 570 250 Z"/>
+          <path d="M580 290 Q630 280 610 250 Q570 280 580 290 Z"/>
+        </g>
+
+        <circle id="eye-left-outer" cx="380" cy="320" r="62" fill="url(#eyeGrad)" stroke="#000" stroke-width="8"/>
+        <ellipse id="eye-left-inner" cx="380" cy="320" rx="32" ry="32" fill="#000"/>
+        <circle id="eye-left-highlight" cx="396" cy="306" r="14" fill="#FFF"/>
+        <circle id="eye-right-outer" cx="520" cy="320" r="62" fill="url(#eyeGrad)" stroke="#000" stroke-width="8"/>
+        <ellipse id="eye-right-inner" cx="520" cy="320" rx="32" ry="32" fill="#000"/>
+        <circle id="eye-right-highlight" cx="536" cy="306" r="14" fill="#FFF"/>
+
+        <circle id="blush-left" cx="340" cy="380" r="28" fill="#FFB3C1" opacity="0.8"/>
+        <circle id="blush-right" cx="560" cy="380" r="28" fill="#FFB3C1" opacity="0.8"/>
+
+        <path id="mouth" d="M420 420 Q450 445 480 420" fill="none" stroke="#E76F51" stroke-width="10" stroke-linecap="round"/>
+
+        <path d="M360 510 Q340 600 380 625 Q400 670 420 625 Q440 600 420 580 Z" 
+              fill="#FF9F1C" stroke="#000" stroke-width="14"/>
+        <path d="M540 510 Q560 600 520 625 Q500 670 480 625 Q460 600 480 580 Z" 
+              fill="#FF9F1C" stroke="#000" stroke-width="14"/>
+        <path d="M280 570 Q260 650 300 675 Q320 720 340 675 Q360 650 340 620 Z" 
+              fill="#FF9F1C" stroke="#000" stroke-width="14"/>
+        <path d="M620 570 Q640 650 600 675 Q580 720 560 675 Q540 650 560 620 Z" 
+              fill="#FF9F1C" stroke="#000" stroke-width="14"/>
+
+        <circle cx="420" cy="215" r="10" fill="#FFB347"/>
+        <circle cx="450" cy="205" r="12" fill="#FFB347"/>
+        <circle cx="480" cy="215" r="10" fill="#FFB347"/>
+        <circle cx="510" cy="225" r="12" fill="#FFB347"/>
+        <circle cx="440" cy="235" r="10" fill="#FFB347"/>
+        <circle cx="490" cy="245" r="10" fill="#FFB347"/>
+
+        <g id="bubble-container"></g>
+      </svg>
+    </div>
+  </div>
+  
+  <div class="controls">
+    <button id="startBtn">启动</button>
+    <button id="stopBtn" disabled>停止</button>
+  </div>
+  
+  <div class="info">
+    <h3>📖 快速开始</h3>
+    <ul>
+      <li>点击"启动"允许浏览器访问摄像头</li>
+      <li>面对摄像头，六角恐龙会模仿你的表情</li>
+      <li>支持：眨眼、张嘴、微笑、眼睛转动</li>
+      <li>首次运行需要联网加载模型（5MB）</li>
+      <li>之后可离线使用</li>
+    </ul>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const status = document.getElementById('status');
+    const fpsEl = document.getElementById('fps');
+    
+    const svgElements = {
+      eyeLeftInner: document.getElementById('eye-left-inner'),
+      eyeRightInner: document.getElementById('eye-right-inner'),
+      eyeLeftHighlight: document.getElementById('eye-left-highlight'),
+      eyeRightHighlight: document.getElementById('eye-right-highlight'),
+      mouth: document.getElementById('mouth'),
+      blushLeft: document.getElementById('blush-left'),
+      blushRight: document.getElementById('blush-right'),
+      gillLeft: document.getElementById('gill-left'),
+      gillRight: document.getElementById('gill-right'),
+      bubbleContainer: document.getElementById('bubble-container')
+    };
+    
+    let faceMesh = null;
+    let isRunning = false;
+    let stream = null;
+    let frameCount = 0;
+    let lastTime = performance.now();
+    let loadTime = performance.now();
+
+    function updateFps() {
+      frameCount++;
+      const now = performance.now();
+      if (now - lastTime >= 1000) {
+        fpsEl.textContent = `FPS: ${frameCount}`;
+        frameCount = 0;
+        lastTime = now;
+      }
+    }
+
+    function drawFaceMesh(landmarks) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!landmarks || landmarks.length < 468) return;
+      
+      const connections = [
+        [10, 338], [338, 297], [297, 332], [332, 284], [284, 251],
+        [251, 389], [389, 356], [356, 454], [454, 323], [323, 361],
+        [361, 288], [288, 397], [397, 365], [365, 379], [379, 378],
+        [378, 400], [400, 377], [377, 152], [152, 148], [148, 176],
+        [176, 149], [149, 150], [150, 136], [136, 172], [172, 58],
+        [58, 132], [132, 93], [93, 234], [234, 127], [127, 162],
+        [162, 21], [21, 54], [54, 103], [103, 67], [67, 109], [109, 10],
+        [61, 146], [146, 91], [91, 181], [181, 84], [84, 17],
+        [17, 314], [314, 405], [405, 321], [321, 375], [375, 291],
+        [61, 185], [185, 40], [40, 39], [39, 37], [37, 0],
+        [0, 267], [267, 269], [269, 270], [270, 409], [409, 291],
+        [1, 2], [2, 97], [97, 98], [98, 126], [126, 246],
+        [246, 197], [197, 195], [195, 6],
+        [33, 160], [160, 158], [158, 159], [159, 157], [157, 173], [173, 133],
+        [33, 7], [7, 163], [163, 144], [144, 145], [145, 153], [153, 133],
+        [362, 385], [385, 387], [387, 388], [388, 466], [466, 263],
+        [362, 382], [382, 381], [381, 380], [380, 374], [374, 373], [373, 362]
+      ];
+      
+      ctx.strokeStyle = '#00FF00';
+      ctx.lineWidth = 1.5;
+      
+      connections.forEach(([i, j]) => {
+        if (landmarks[i] && landmarks[j]) {
+          const x1 = landmarks[i].x * canvas.width;
+          const y1 = landmarks[i].y * canvas.height;
+          const x2 = landmarks[j].x * canvas.width;
+          const y2 = landmarks[j].y * canvas.height;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        }
+      });
+    }
+
+    function applyExpression(landmarks) {
+      if (!landmarks || landmarks.length < 468) return;
+      
+      const leftEyeLeft = landmarks[33];
+      const leftEyeRight = landmarks[133];
+      const leftEyeTop = landmarks[159];
+      const leftEyeBottom = landmarks[145];
+      const rightEyeLeft = landmarks[362];
+      const rightEyeRight = landmarks[263];
+      const rightEyeTop = landmarks[386];
+      const rightEyeBottom = landmarks[374];
+      
+      function getEyeOpenness(top, bottom, left, right) {
+        if (!top || !bottom || !left || !right) return 0.3;
+        const vertical = Math.abs(top.y - bottom.y);
+        const horizontal = Math.abs(right.x - left.x);
+        return vertical / horizontal;
+      }
+      
+      const leftEyeOpenness = getEyeOpenness(leftEyeTop, leftEyeBottom, leftEyeLeft, leftEyeRight);
+      const rightEyeOpenness = getEyeOpenness(rightEyeTop, rightEyeBottom, rightEyeLeft, rightEyeRight);
+      const avgEyeOpenness = (leftEyeOpenness + rightEyeOpenness) / 2;
+      const isBlinking = avgEyeOpenness < 0.22;
+      
+      const leftIrisX = landmarks[468]?.x || leftEyeLeft?.x || 0;
+      const leftIrisY = landmarks[468]?.y || leftEyeTop?.y || 0;
+      const rightIrisX = landmarks[473]?.x || rightEyeRight?.x || 0;
+      const rightIrisY = landmarks[473]?.y || rightEyeTop?.y || 0;
+      
+      const leftPupilX = ((leftIrisX - 0.35) * 80) || 0;
+      const leftPupilY = ((leftIrisY - 0.35) * 80) || 0;
+      const rightPupilX = ((rightIrisX - 0.55) * 80) || 0;
+      const rightPupilY = ((rightIrisY - 0.35) * 80) || 0;
+      
+      if (svgElements.eyeLeftInner && svgElements.eyeRightInner) {
+        if (isBlinking) {
+          svgElements.eyeLeftInner.setAttribute('ry', 3);
+          svgElements.eyeLeftInner.setAttribute('rx', 32);
+          svgElements.eyeRightInner.setAttribute('ry', 3);
+          svgElements.eyeRightInner.setAttribute('rx', 32);
+        } else {
+          svgElements.eyeLeftInner.setAttribute('ry', 32);
+          svgElements.eyeLeftInner.setAttribute('rx', 32);
+          svgElements.eyeRightInner.setAttribute('ry', 32);
+          svgElements.eyeRightInner.setAttribute('rx', 32);
+          svgElements.eyeLeftInner.setAttribute('cx', 380 + leftPupilX);
+          svgElements.eyeLeftInner.setAttribute('cy', 320 + leftPupilY);
+          svgElements.eyeRightInner.setAttribute('cx', 520 + rightPupilX);
+          svgElements.eyeRightInner.setAttribute('cy', 320 + rightPupilY);
+        }
+      }
+      
+      if (svgElements.eyeLeftHighlight && svgElements.eyeRightHighlight) {
+        if (!isBlinking) {
+          svgElements.eyeLeftHighlight.setAttribute('cx', 396 + leftPupilX * 0.5);
+          svgElements.eyeLeftHighlight.setAttribute('cy', 306 + leftPupilY * 0.5);
+          svgElements.eyeRightHighlight.setAttribute('cx', 536 + rightPupilX * 0.5);
+          svgElements.eyeRightHighlight.setAttribute('cy', 306 + rightPupilY * 0.5);
+        }
+      }
+      
+      const mouthLeft = landmarks[61];
+      const mouthRight = landmarks[291];
+      const mouthTop = landmarks[13];
+      const mouthBottom = landmarks[14];
+      
+      if (svgElements.mouth && mouthLeft && mouthRight && mouthTop && mouthBottom) {
+        const mouthCenterX = (mouthLeft.x + mouthRight.x) / 2;
+        const mouthCenterY = (mouthTop.y + mouthBottom.y) / 2;
+        const mouthOffsetX = (mouthCenterX - 0.5) * 200;
+        const mouthOffsetY = (mouthCenterY - 0.53) * 150;
+        const mouthOpenness = Math.abs(mouthBottom.y - mouthTop.y);
+        const mouthWidth = Math.abs(mouthRight.x - mouthLeft.x);
+        const fillThreshold = 0.025;
+        
+        let mouthPath;
+        if (mouthOpenness > fillThreshold) {
+          svgElements.mouth.setAttribute('fill', '#E76F51');
+          svgElements.mouth.setAttribute('stroke', '#C44D3D');
+          svgElements.mouth.setAttribute('stroke-width', '2');
+          svgElements.mouth.setAttribute('stroke-linecap', 'round');
+          const openDepth = Math.min(mouthOpenness * 600, 70);
+          const cornerRadius = 8;
+          mouthPath = `M${420 + mouthOffsetX} ${420 + mouthOffsetY}
+                       Q${420 + mouthOffsetX} ${420 + mouthOffsetY + cornerRadius} 
+                       ${422 + mouthOffsetX} ${420 + mouthOffsetY + openDepth * 0.3}
+                       Q${420 + mouthOffsetX} ${420 + mouthOffsetY + openDepth} 
+                       ${450 + mouthOffsetX} ${420 + mouthOffsetY + openDepth + 10}
+                       Q${480 + mouthOffsetX} ${420 + mouthOffsetY + openDepth} 
+                       ${478 + mouthOffsetX} ${420 + mouthOffsetY + openDepth * 0.3}
+                       Q${480 + mouthOffsetX} ${420 + mouthOffsetY + cornerRadius} 
+                       ${480 + mouthOffsetX} ${420 + mouthOffsetY}
+                       Q${450 + mouthOffsetX} ${420 + mouthOffsetY - 5} 
+                       ${420 + mouthOffsetX} ${420 + mouthOffsetY}
+                       Z`;
+        } else {
+          svgElements.mouth.setAttribute('fill', 'none');
+          svgElements.mouth.setAttribute('stroke', '#E76F51');
+          svgElements.mouth.setAttribute('stroke-width', '10');
+          svgElements.mouth.setAttribute('stroke-linecap', 'round');
+          const smileCurve = 20 + (mouthWidth - 0.2) * 80;
+          mouthPath = `M${420 + mouthOffsetX} ${420 + mouthOffsetY} 
+                       Q${450 + mouthOffsetX} ${420 + mouthOffsetY + Math.max(smileCurve, 15)} 
+                       ${480 + mouthOffsetX} ${420 + mouthOffsetY}`;
+        }
+        svgElements.mouth.setAttribute('d', mouthPath);
+      }
+      
+      if (mouthLeft && mouthRight && svgElements.blushLeft && svgElements.blushRight) {
+        const blushOpacity = 0.5 + Math.min(mouthWidth * 2, 0.5);
+        svgElements.blushLeft.setAttribute('opacity', Math.max(0.3, blushOpacity));
+        svgElements.blushRight.setAttribute('opacity', Math.max(0.3, blushOpacity));
+      }
+      
+      const headX = landmarks[10]?.x || 0.5;
+      const headY = landmarks[10]?.y || 0.3;
+      const gillAngle = (headX - 0.5) * 15;
+      
+      if (svgElements.gillLeft && svgElements.gillRight) {
+        svgElements.gillLeft.setAttribute('transform', `rotate(${gillAngle} 300 250)`);
+        svgElements.gillRight.setAttribute('transform', `rotate(${-gillAngle} 570 250)`);
+      }
+    }
+
+    function createBubble() {
+      if (!svgElements.bubbleContainer) return;
+      const bubble = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      const size = Math.random() * 15 + 10;
+      const x = Math.random() * 60 + 420;
+      const y = 440;
+      bubble.setAttribute('cx', x);
+      bubble.setAttribute('cy', y);
+      bubble.setAttribute('r', size);
+      bubble.setAttribute('fill', 'url(#bubbleGrad)');
+      bubble.setAttribute('stroke', '#e0f7fa');
+      bubble.setAttribute('stroke-width', 2);
+      svgElements.bubbleContainer.appendChild(bubble);
+      let bubbleY = y;
+      function moveBubble() {
+        bubbleY -= 1;
+        bubble.setAttribute('cy', bubbleY);
+        const opacity = 1 - (bubbleY - 200) / 240;
+        bubble.setAttribute('opacity', opacity);
+        if (bubbleY > 200) {
+          requestAnimationFrame(moveBubble);
+        } else {
+          svgElements.bubbleContainer.removeChild(bubble);
+        }
+      }
+      requestAnimationFrame(moveBubble);
+    }
+
+    async function initFaceMesh() {
+      status.textContent = '🔄 正在加载模型（约 5MB，首次需要 10-30 秒）...';
+      console.log('Loading FaceMesh...');
+      
+      faceMesh = new FaceMesh({
+        locateFile: (file) => {
+          return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+        }
+      });
+
+      faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: false,
+        minDetectionConfidence: 0.3,
+        minTrackingConfidence: 0.3
+      });
+
+      faceMesh.onResults((results) => {
+        updateFps();
+        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+          const landmarks = results.multiFaceLandmarks[0];
+          status.textContent = `✅ 追踪中 - ${landmarks.length} 个点`;
+          drawFaceMesh(landmarks);
+          applyExpression(landmarks);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          status.textContent = '🔍 未检测到面部';
+        }
+      });
+      
+      const loadDuration = ((performance.now() - loadTime) / 1000).toFixed(1);
+      console.log(`FaceMesh loaded in ${loadDuration}s`);
+      status.textContent = `✅ 模型加载完成（${loadDuration}秒），点击启动开始`;
+    }
+
+    async function start() {
+      try {
+        if (typeof FaceMesh === 'undefined') {
+          throw new Error('FaceMesh 库未加载，请检查网络连接');
+        }
+        
+        if (!faceMesh) {
+          await initFaceMesh();
+        }
+        
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480 }
+        });
+        
+        video.srcObject = stream;
+        await new Promise(resolve => {
+          video.onloadedmetadata = () => {
+            video.play();
+            resolve();
+          };
+        });
+        
+        isRunning = true;
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        status.textContent = '✅ 运行中 - 请面对摄像头';
+        processFrame();
+        setInterval(createBubble, 3000);
+        
+      } catch (error) {
+        status.textContent = '❌ 错误：' + error.message;
+      }
+    }
+
+    async function processFrame() {
+      if (!isRunning) return;
+      await faceMesh.send({ image: video });
+      requestAnimationFrame(processFrame);
+    }
+
+    function stop() {
+      isRunning = false;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+      video.srcObject = null;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      status.textContent = '已停止';
+    }
+
+    startBtn.addEventListener('click', start);
+    stopBtn.addEventListener('click', stop);
+    
+    window.addEventListener('load', () => {
+      console.log('FaceMesh available:', typeof FaceMesh);
+      if (typeof FaceMesh === 'undefined') {
+        status.textContent = '⚠️ 正在加载库文件...';
+      }
+    });
+  </script>
+</body>
+</html>
