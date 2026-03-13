@@ -1,0 +1,83 @@
+<svg width="800" height="800" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+  <!-- 定义眼睛渐变 -->
+  <defs>
+    <linearGradient id="eyeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4CC9F0"/>
+      <stop offset="100%" stop-color="#4CAF50"/>
+    </linearGradient>
+    <!-- 泡泡渐变 -->
+    <linearGradient id="bubbleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#e0f7fa" stop-opacity="0.7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 尾巴（添加id用于动画） -->
+  <path id="tail" d="M140 340 Q90 450 140 560 Q200 660 310 610 L330 510 Z" 
+        fill="#FFF9E6" stroke="#000" stroke-width="18"/>
+  <!-- 尾巴条纹 -->
+  <path d="M155 375 L225 415" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+  <path d="M165 415 L235 455" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+  <path d="M175 455 L245 495" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+  <path d="M185 495 L255 535" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+  <path d="M195 535 L265 575" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+  <path d="M215 475 L305 495" stroke="#FF5A5F" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- 身体与头部 -->
+  <path d="M320 190 Q400 110 570 190 Q650 270 670 400 Q650 530 590 610 Q530 660 420 670 Q320 660 260 610 Q220 560 220 510 L330 510 Q330 410 320 190 Z" 
+        fill="#FFD166" stroke="#000" stroke-width="18"/>
+  <!-- 腹部粉色 -->
+  <path d="M400 470 Q500 490 600 470 Q580 610 520 650 Q420 660 320 650 Q280 610 400 470 Z" 
+        fill="#FFB3C1"/>
+
+  <!-- 左侧外鳃（添加id） -->
+  <g id="gill-left" fill="#FF5A5F" stroke="#000" stroke-width="14">
+    <path d="M320 210 Q270 170 290 130 Q330 170 320 210 Z"/>
+    <path d="M310 250 Q250 230 270 190 Q310 230 310 250 Z"/>
+    <path d="M300 290 Q250 280 270 250 Q310 280 300 290 Z"/>
+    <!-- <path d="M320 330 Q270 320 290 290 Q330 320 320 330 Z"/> -->
+  </g>
+  <!-- 右侧外鳃（添加id） -->
+  <g id="gill-right" fill="#FF5A5F" stroke="#000" stroke-width="14">
+    <path d="M560 210 Q610 170 590 130 Q550 170 560 210 Z"/>
+    <path d="M570 250 Q630 230 610 190 Q570 230 570 250 Z"/>
+    <path d="M580 290 Q630 280 610 250 Q570 280 580 290 Z"/>
+    <!-- <path d="M560 330 Q610 320 590 290 Q550 320 560 330 Z"/> -->
+  </g>
+
+  <!-- 眼睛（添加id） -->
+  <!-- 左眼 -->
+  <circle id="eye-left-outer" cx="380" cy="320" r="62" fill="url(#eyeGrad)" stroke="#000" stroke-width="8"/>
+  <circle id="eye-left-inner" cx="380" cy="320" r="32" fill="#000"/>
+  <circle cx="396" cy="306" r="14" fill="#FFF"/>
+  <!-- 右眼 -->
+  <circle id="eye-right-outer" cx="520" cy="320" r="62" fill="url(#eyeGrad)" stroke="#000" stroke-width="8"/>
+  <circle id="eye-right-inner" cx="520" cy="320" r="32" fill="#000"/>
+  <circle cx="536" cy="306" r="14" fill="#FFF"/>
+
+  <!-- 腮红 -->
+  <circle cx="340" cy="380" r="28" fill="#FFB3C1" opacity="0.8"/>
+  <circle cx="560" cy="380" r="28" fill="#FFB3C1" opacity="0.8"/>
+
+  <!-- 微笑嘴 -->
+  <path d="M420 420 Q450 445 480 420" stroke="#E76F51" stroke-width="10" fill="none" stroke-linecap="round"/>
+
+  <!-- 四肢 -->
+  <path d="M360 510 Q340 600 380 625 Q400 670 420 625 Q440 600 420 580 Z" 
+        fill="#FF9F1C" stroke="#000" stroke-width="14"/>
+  <path d="M540 510 Q560 600 520 625 Q500 670 480 625 Q460 600 480 580 Z" 
+        fill="#FF9F1C" stroke="#000" stroke-width="14"/>
+  <path d="M280 570 Q260 650 300 675 Q320 720 340 675 Q360 650 340 620 Z" 
+        fill="#FF9F1C" stroke="#000" stroke-width="14"/>
+  <path d="M620 570 Q640 650 600 675 Q580 720 560 675 Q540 650 560 620 Z" 
+        fill="#FF9F1C" stroke="#000" stroke-width="14"/>
+
+  <!-- 头部斑点 -->
+  <circle cx="420" cy="215" r="10" fill="#FFB347"/>
+  <circle cx="450" cy="205" r="12" fill="#FFB347"/>
+  <circle cx="480" cy="215" r="10" fill="#FFB347"/>
+  <circle cx="510" cy="225" r="12" fill="#FFB347"/>
+  <circle cx="440" cy="235" r="10" fill="#FFB347"/>
+  <circle cx="490" cy="245" r="10" fill="#FFB347"/>
+
+</svg>

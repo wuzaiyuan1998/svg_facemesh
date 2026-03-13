@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>六角恐龙</title>
+    <style>
+        .container {
+            width: 1900px;
+            height: 1900px;
+        }
+    </style>
+    1
+</head>
+<body>
+
+<div class="container">
+
+
+    <div class="svg-panel">
+        <svg id="character" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+            <!-- 定义渐变 -->
+            <defs>
+                <linearGradient id="eyeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#4CC9F0"/>
+                    <stop offset="100%" stop-color="#4CAF50"/>
+                </linearGradient>
+                <linearGradient id="bubbleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+                    <stop offset="100%" stop-color="#e0f7fa" stop-opacity="0.7"/>
+                </linearGradient>
+            </defs>
+
+            <!-- 尾巴 -->
+            <path id="tail" d="M140 340 Q90 450 140 560 Q200 660 310 610 L330 510 Z"
+                  fill="#FFF9E6" stroke="#000" stroke-width="18"/>
+            <path d="M155 375 L225 415" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+            <path d="M165 415 L235 455" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+            <path d="M175 455 L245 495" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+            <path d="M185 495 L255 535" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+            <path d="M195 535 L265 575" stroke="#FF9F1C" stroke-width="8" stroke-linecap="round"/>
+            <path d="M215 475 L305 495" stroke="#FF5A5F" stroke-width="14" stroke-linecap="round"/>
+
+            <!-- 身体与头部 -->
+            <path d="M320 190 Q400 110 570 190 Q650 270 670 400 Q650 530 590 610 Q530 660 420 670 Q320 660 260 610 Q220 560 220 510 L330 510 Q330 410 320 190 Z"
+                  fill="#FFD166" stroke="#000" stroke-width="18"/>
+            <path d="M400 470 Q500 490 600 470 Q580 610 520 650 Q420 660 320 650 Q280 610 400 470 Z"
+                  fill="#FFB3C1"/>
+
+            <!-- 外鳃 -->
+            <g id="gill-left" fill="#FF5A5F" stroke="#000" stroke-width="14">
+                <path d="M320 210 Q270 170 290 130 Q330 170 320 210 Z"/>
+                <path d="M310 250 Q250 230 270 190 Q310 230 310 250 Z"/>
+                <path d="M300 290 Q250 280 270 250 Q310 280 300 290 Z"/>
+                <!-- <path d="M320 330 Q270 320 290 290 Q330 320 320 330 Z"/> -->
+            </g>
+            <g id="gill-right" fill="#FF5A5F" stroke="#000" stroke-width="14">
+                <path d="M560 210 Q610 170 590 130 Q550 170 560 210 Z"/>
+                <path d="M570 250 Q630 230 610 190 Q570 230 570 250 Z"/>
+                <path d="M580 290 Q630 280 610 250 Q570 280 580 290 Z"/>
+                <!-- <path d="M560 330 Q610 320 590 290 Q550 320 560 330 Z"/> -->
+            </g>
+
+            <!-- 眼睛 -->
+            <circle id="eye-left-outer" cx="380" cy="320" r="62" fill="url(#eyeGrad)" stroke="#000" stroke-width="8"/>
+            <circle id="eye-left-inner" cx="380" cy="320" r="32" fill="#000"/>
+            <circle cx="396" cy="306" r="14" fill="#FFF"/>
+            <circle id="eye-right-outer" cx="520" cy="320" r="62" fill="url(#eyeGrad)" stroke="#000" stroke-width="8"/>
+            <circle id="eye-right-inner" cx="520" cy="320" r="32" fill="#000"/>
+            <circle cx="536" cy="306" r="14" fill="#FFF"/>
+
+            <!-- 腮红 -->
+            <circle cx="340" cy="380" r="28" fill="#FFB3C1" opacity="0.8"/>
+            <circle cx="560" cy="380" r="28" fill="#FFB3C1" opacity="0.8"/>
+
+            <!-- 嘴巴（添加id用于动画） -->
+            <path id="mouth" d="M420 420 Q450 445 480 420" stroke="#E76F51" stroke-width="10" fill="none"
+                  stroke-linecap="round"/>
+
+            <!-- 四肢 -->
+            <path d="M360 510 Q340 600 380 625 Q400 670 420 625 Q440 600 420 580 Z"
+                  fill="#FF9F1C" stroke="#000" stroke-width="14"/>
+            <path d="M540 510 Q560 600 520 625 Q500 670 480 625 Q460 600 480 580 Z"
+                  fill="#FF9F1C" stroke="#000" stroke-width="14"/>
+            <path d="M280 570 Q260 650 300 675 Q320 720 340 675 Q360 650 340 620 Z"
+                  fill="#FF9F1C" stroke="#000" stroke-width="14"/>
+            <path d="M620 570 Q640 650 600 675 Q580 720 560 675 Q540 650 560 620 Z"
+                  fill="#FF9F1C" stroke="#000" stroke-width="14"/>
+
+            <!-- 头部斑点 -->
+            <circle cx="420" cy="215" r="10" fill="#FFB347"/>
+            <circle cx="450" cy="205" r="12" fill="#FFB347"/>
+            <circle cx="480" cy="215" r="10" fill="#FFB347"/>
+            <circle cx="510" cy="225" r="12" fill="#FFB347"/>
+            <circle cx="440" cy="235" r="10" fill="#FFB347"/>
+            <circle cx="490" cy="245" r="10" fill="#FFB347"/>
+
+            <!-- 泡泡容器 -->
+            <g id="bubble-container"></g>
+        </svg>
+    </div>
+</div>
+
+
+<script type="module">
+    // 1. 尾巴晃动
+    const tail = document.getElementById('tail');
+    let tailAngle = 0;
+    let tailDirection = 1;
+
+    function animateTail() {
+        tailAngle += 0.5 * tailDirection;
+        if (tailAngle > 5 || tailAngle < -5) tailDirection *= -1;
+        tail.setAttribute('transform', `rotate(${tailAngle} 200 450)`);
+        requestAnimationFrame(animateTail);
+    }
+
+    // 2. 外鳃摆动
+    const gillLeft = document.getElementById('gill-left');
+    const gillRight = document.getElementById('gill-right');
+    let gillAngle = 0;
+    let gillDirection = 1;
+
+    function animateGills() {
+        gillAngle += 0.3 * gillDirection;
+        if (gillAngle > 3 || gillAngle < -3) gillDirection *= -1;
+        gillLeft.setAttribute('transform', `rotate(${gillAngle} 300 250)`);
+        gillRight.setAttribute('transform', `rotate(${-gillAngle} 570 250)`);
+        requestAnimationFrame(animateGills);
+    }
+
+    // 3. 眨眼动画
+    const eyeLeftInner = document.getElementById('eye-left-inner');
+    const eyeRightInner = document.getElementById('eye-right-inner');
+    let isBlinking = false;
+
+    function blink() {
+        if (isBlinking) return;
+        isBlinking = true;
+        eyeLeftInner.setAttribute('r', 5);
+        eyeRightInner.setAttribute('r', 5);
+        setTimeout(() => {
+            eyeLeftInner.setAttribute('r', 32);
+            eyeRightInner.setAttribute('r', 32);
+            isBlinking = false;
+        }, 200);
+        setTimeout(blink, Math.random() * 3000 + 3000);
+    }
+
+    // 4. 吐泡泡 + 嘴型适配
+    const mouth = document.getElementById('mouth');
+    const bubbleContainer = document.getElementById('bubble-container');
+    const smileMouth = "M420 420 Q450 445 480 420"; // 微笑嘴型
+    const openMouth = "M420 420 Q450 460 480 420";    // 张开嘴型
+
+    function openMouthAndBubble() {
+        // 第一步：张开嘴巴
+        mouth.setAttribute('d', openMouth);
+
+        // 第二步：延迟200ms后生成泡泡
+        setTimeout(() => {
+            const bubble = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            const size = Math.random() * 15 + 10;
+            const x = Math.random() * 60 + 420;
+            const y = 440;
+
+            bubble.setAttribute('cx', x);
+            bubble.setAttribute('cy', y);
+            bubble.setAttribute('r', size);
+            bubble.setAttribute('fill', 'url(#bubbleGrad)');
+            bubble.setAttribute('stroke', '#e0f7fa');
+            bubble.setAttribute('stroke-width', 2);
+            bubbleContainer.appendChild(bubble);
+
+            // 泡泡上浮动画
+            let bubbleY = y;
+
+            function moveBubble() {
+                bubbleY -= 1;
+                bubble.setAttribute('cy', bubbleY);
+                const opacity = 1 - (bubbleY - 200) / 240;
+                bubble.setAttribute('opacity', opacity);
+
+                if (bubbleY > 200) {
+                    requestAnimationFrame(moveBubble);
+                } else {
+                    bubbleContainer.removeChild(bubble);
+                }
+            }
+
+            requestAnimationFrame(moveBubble);
+        }, 200);
+
+        // 第三步：再延迟300ms后闭上嘴巴（恢复微笑）
+        setTimeout(() => {
+            mouth.setAttribute('d', smileMouth);
+        }, 500);
+
+        // 随机5-10秒后再次吐泡泡
+        setTimeout(openMouthAndBubble, Math.random() * 5000 + 5000);
+    }
+
+    // 启动所有动画
+    animateTail();
+    animateGills();
+    blink();
+    openMouthAndBubble();
+</script>
+</body>
+</html>
