@@ -62,6 +62,9 @@
             color: white;
             font-weight: bold;
         }
+        #liveModeBtn {
+            background: #f59e0b;
+        }
         button:disabled { background: #9ca3af; cursor: not-allowed; }
         #status {
             color: #ffd700;
@@ -90,6 +93,37 @@
         }
         .info h3 { color: #667eea; margin-bottom: 10px; }
         .info ul { margin-left: 20px; color: #4b5563; }
+
+        /* 直播模式样式 */
+        body.live-mode-active {
+            background: transparent !important;
+        }
+        body.live-mode-active > h1,
+        body.live-mode-active > .subtitle,
+        body.live-mode-active > #status,
+        body.live-mode-active > .container > .video-panel,
+        body.live-mode-active > .controls,
+        body.live-mode-active > .info,
+        body.live-mode-active > #debug-panel {
+            display: none;
+        }
+        body.live-mode-active > .container {
+            padding: 0;
+            margin: 0;
+            max-width: 100vw;
+            height: 100vh;
+            align-items: center;
+            justify-content: center;
+        }
+        body.live-mode-active .svg-panel {
+            background: transparent;
+            box-shadow: none;
+            padding: 0;
+        }
+        body.live-mode-active #character {
+            background: transparent;
+        }
+
     </style>
 </head>
 <body>
@@ -216,6 +250,7 @@
 <div class="controls">
     <button id="startBtn">启动</button>
     <button id="stopBtn" disabled>停止</button>
+    <button id="liveModeBtn">进入直播模式</button>
 </div>
 
 <div class="info">
@@ -239,6 +274,7 @@
     const ctx = canvas.getContext('2d');
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
+    const liveModeBtn = document.getElementById('liveModeBtn');
     const status = document.getElementById('status');
     const fpsEl = document.getElementById('fps');
 
@@ -644,7 +680,7 @@
         const rightPupilY = mapIrisMovement(baseRightY + blendshapeRightY, 35);
 
         // 调试输出
-        console.log(`👁️ Blink L:${blinkLeft.toFixed(2)} R:${blinkRight.toFixed(2)} | Look H:${horizontalLeft.toFixed(2)} V:${verticalLeft.toFixed(2)} | Iris L:[${irisLeftX.toFixed(3)},${irisLeftY.toFixed(3)}] Pupil X:${leftPupilX.toFixed(1)} Y:${leftPupilY.toFixed(1)}`);
+        // console.log(`👁️ Blink L:${blinkLeft.toFixed(2)} R:${blinkRight.toFixed(2)} | Look H:${horizontalLeft.toFixed(2)} V:${verticalLeft.toFixed(2)} | Iris L:[${irisLeftX.toFixed(3)},${irisLeftY.toFixed(3)}] Pupil X:${leftPupilX.toFixed(1)} Y:${leftPupilY.toFixed(1)}`);
 
         // 应用瞳孔和眨眼 - 使用渐进式眨眼
         if (svgElements.eyeLeftInner && svgElements.eyeRightInner) {
@@ -839,18 +875,20 @@
         if (!isRunning) return;
 
         const startTime = performance.now();
-        const results = faceLandmarker.detectForVideo(video, startTime);
+        if (faceLandmarker) {
+            const results = faceLandmarker.detectForVideo(video, startTime);
 
-        updateFps();
+            updateFps();
 
-        if (results.faceLandmarks && results.faceLandmarks.length > 0) {
-            const landmarks = results.faceLandmarks[0];
-            status.textContent = `✅ 追踪中 - ${landmarks.length} 个点`;
-            drawFaceMesh(landmarks);
-            applyExpression(landmarks, results);
-        } else {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            status.textContent = '🔍 未检测到面部';
+            if (results.faceLandmarks && results.faceLandmarks.length > 0) {
+                const landmarks = results.faceLandmarks[0];
+                status.textContent = `✅ 追踪中 - ${landmarks.length} 个点`;
+                drawFaceMesh(landmarks);
+                applyExpression(landmarks, results);
+            } else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                status.textContent = '🔍 未检测到面部';
+            }
         }
 
         requestAnimationFrame(processFrame);
@@ -870,9 +908,26 @@
         status.textContent = '已停止';
     }
 
+    // ============ 直播模式逻辑 ============
+    function toggleLiveMode() {
+        const isActive = document.body.classList.toggle('live-mode-active');
+        liveModeBtn.textContent = isActive ? '退出直播模式' : '进入直播模式';
+    }
+
+    liveModeBtn.addEventListener('click', toggleLiveMode);
+
+
     // 事件监听
     startBtn.addEventListener('click', start);
     stopBtn.addEventListener('click', stop);
+
+    // 自动启动并进入直播模式
+    window.addEventListener('load', async () => {
+        await start();
+        if (isRunning && !document.body.classList.contains('live-mode-active')) {
+            toggleLiveMode();
+        }
+    });
 </script>
 </body>
 </html>
