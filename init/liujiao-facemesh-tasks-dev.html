@@ -94,42 +94,6 @@
         .info h3 { color: #667eea; margin-bottom: 10px; }
         .info ul { margin-left: 20px; color: #4b5563; }
 
-        #debug-panel {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 15px;
-            border-radius: 10px;
-            z-index: 100;
-            font-family: monospace;
-            width: 300px;
-        }
-        #debug-panel h3 {
-            margin-top: 0;
-            margin-bottom: 10px;
-            font-size: 16px;
-            border-bottom: 1px solid #555;
-            padding-bottom: 5px;
-        }
-        .debug-slider {
-            margin-bottom: 10px;
-        }
-        .debug-slider label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 12px;
-            cursor: help;
-        }
-        .debug-slider input {
-            width: 100%;
-        }
-        .debug-slider span {
-            float: right;
-            font-weight: bold;
-        }
-
         /* 直播模式样式 */
         body.live-mode-active {
             background: transparent !important;
@@ -283,38 +247,6 @@
     </div>
 </div>
 
-<div id="debug-panel">
-    <h3>⚙️ 调试面板</h3>
-    <div class="debug-slider">
-        <label for="minDetectionConfidence" title="模型首次检测到人脸所需的最低置信度分数。值越高，检测越严格但可能漏检；值越低，越容易检测但可能误判。">最小检测置信度: <span id="minDetectionConfidenceValue">0.5</span></label>
-        <input type="range" id="minDetectionConfidence" min="0.1" max="1.0" step="0.1" value="0.5">
-    </div>
-    <div class="debug-slider">
-        <label for="minTrackingConfidence" title="在视频帧之间跟踪人脸所需的最低置信度分数。值越高，跟踪越稳定但跟丢后难找回；值越低，跟踪越灵敏但可能不稳定。">最小跟踪置信度: <span id="minTrackingConfidenceValue">0.5</span></label>
-        <input type="range" id="minTrackingConfidence" min="0.1" max="1.0" step="0.1" value="0.5">
-    </div>
-    <div class="debug-slider">
-        <label for="smoothingFactor" title="应用于身体和头部运动的平滑滤波系数。值越大，运动越平滑但延迟越高；值越小，响应越快但抖动可能更明显。">平滑系数: <span id="smoothingFactorValue">0.3</span></label>
-        <input type="range" id="smoothingFactor" min="0.1" max="1.0" step="0.1" value="0.3">
-    </div>
-    <div class="debug-slider">
-        <label for="eyeSmoothingFactor" title="专门应用于眼部运动的平滑系数。较高的值可以减少眼部跳动。">眼部平滑: <span id="eyeSmoothingFactorValue">0.5</span></label>
-        <input type="range" id="eyeSmoothingFactor" min="0.1" max="1.0" step="0.1" value="0.5">
-    </div>
-    <div class="debug-slider">
-        <label for="deadZone" title="忽略微小运动的阈值。只有当运动变化量超过此值时才会被应用，有助于消除传感器噪声和轻微抖动。">死区阈值: <span id="deadZoneValue">0.003</span></label>
-        <input type="range" id="deadZone" min="0.001" max="0.05" step="0.001" value="0.003">
-    </div>
-    <div class="debug-slider">
-        <label for="eyeDeadZone" title="专门为眼眶（Socket）平移设置的死区阈值。">眼部死区: <span id="eyeDeadZoneValue">0.015</span></label>
-        <input type="range" id="eyeDeadZone" min="0.001" max="0.05" step="0.001" value="0.015">
-    </div>
-    <div class="debug-slider">
-        <label for="irisDeadZone" title="专门为虹膜（瞳孔）运动设置的死区阈值，用于过滤眼球的微小颤动。">虹膜死区: <span id="irisDeadZoneValue">0.012</span></label>
-        <input type="range" id="irisDeadZone" min="0.001" max="0.05" step="0.001" value="0.012">
-    </div>
-</div>
-
 <div class="controls">
     <button id="startBtn">启动</button>
     <button id="stopBtn" disabled>停止</button>
@@ -383,8 +315,8 @@
     let tailTime = 0;
 
     // ============ 平滑滤波（消除抖动） ============
-    let smoothingFactor = 0.3;
-    let eyeSmoothingFactor = 0.5;
+    const smoothingFactor = 0.3;
+    const eyeSmoothingFactor = 0.5;
 
     const prevData = {
         faceX: 0,
@@ -418,9 +350,9 @@
     };
 
     // 死区阈值 - 🔥 降低阈值，提高灵敏度
-    let deadZone = 0.003;
-    let eyeDeadZone = 0.015;
-    let irisDeadZone = 0.012; // 从 0.02 降低到 0.012，提高灵敏度
+    const deadZone = 0.003;
+    const eyeDeadZone = 0.015;
+    const irisDeadZone = 0.012; // 从 0.02 降低到 0.012，提高灵敏度
 
     function smoothValue(current, prev, factor) {
         return prev + (current - prev) * factor;
@@ -947,8 +879,8 @@
             outputFacialTransformationMatrixes: false,
             runningMode: 'VIDEO',
             maxNumFaces: 1,
-            minDetectionConfidence: config.minDetectionConfidence,
-            minTrackingConfidence: config.minTrackingConfidence
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
         });
 
         status.textContent = '✅ 模型加载完成';
@@ -1025,88 +957,20 @@
         status.textContent = '已停止';
     }
 
-    // ============ 调试面板逻辑 ============
-    const debugPanel = {
-        minDetectionConfidence: document.getElementById('minDetectionConfidence'),
-        minDetectionConfidenceValue: document.getElementById('minDetectionConfidenceValue'),
-        minTrackingConfidence: document.getElementById('minTrackingConfidence'),
-        minTrackingConfidenceValue: document.getElementById('minTrackingConfidenceValue'),
-        smoothingFactor: document.getElementById('smoothingFactor'),
-        smoothingFactorValue: document.getElementById('smoothingFactorValue'),
-        eyeSmoothingFactor: document.getElementById('eyeSmoothingFactor'),
-        eyeSmoothingFactorValue: document.getElementById('eyeSmoothingFactorValue'),
-        deadZone: document.getElementById('deadZone'),
-        deadZoneValue: document.getElementById('deadZoneValue'),
-        eyeDeadZone: document.getElementById('eyeDeadZone'),
-        eyeDeadZoneValue: document.getElementById('eyeDeadZoneValue'),
-        irisDeadZone: document.getElementById('irisDeadZone'),
-        irisDeadZoneValue: document.getElementById('irisDeadZoneValue'),
-    };
-
-    debugPanel.minDetectionConfidence.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        config.minDetectionConfidence = value;
-        debugPanel.minDetectionConfidenceValue.textContent = value.toFixed(1);
-        reinitFaceLandmarker();
-    });
-
-    debugPanel.minTrackingConfidence.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        config.minTrackingConfidence = value;
-        debugPanel.minTrackingConfidenceValue.textContent = value.toFixed(1);
-        reinitFaceLandmarker();
-    });
-
-    debugPanel.smoothingFactor.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        smoothingFactor = value;
-        debugPanel.smoothingFactorValue.textContent = value.toFixed(1);
-    });
-
-    debugPanel.eyeSmoothingFactor.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        eyeSmoothingFactor = value;
-        debugPanel.eyeSmoothingFactorValue.textContent = value.toFixed(1);
-    });
-
-    debugPanel.deadZone.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        deadZone = value;
-        debugPanel.deadZoneValue.textContent = value.toFixed(3);
-    });
-
-    debugPanel.eyeDeadZone.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        eyeDeadZone = value;
-        debugPanel.eyeDeadZoneValue.textContent = value.toFixed(3);
-    });
-
-    debugPanel.irisDeadZone.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        irisDeadZone = value;
-        debugPanel.irisDeadZoneValue.textContent = value.toFixed(3);
-    });
-
     // ============ 直播模式逻辑 ============
-    function toggleLiveMode() {
+    liveModeBtn.addEventListener('click', () => {
         const isActive = document.body.classList.toggle('live-mode-active');
-        liveModeBtn.textContent = isActive ? '退出直播模式' : '进入直播模式';
-    }
-
-    liveModeBtn.addEventListener('click', toggleLiveMode);
+        if (isActive) {
+            liveModeBtn.textContent = '退出直播模式';
+        } else {
+            liveModeBtn.textContent = '进入直播模式';
+        }
+    });
 
 
     // 事件监听
     startBtn.addEventListener('click', start);
     stopBtn.addEventListener('click', stop);
-
-    // 自动启动并进入直播模式
-    window.addEventListener('load', async () => {
-        await start();
-        if (isRunning && !document.body.classList.contains('live-mode-active')) {
-            toggleLiveMode();
-        }
-    });
 </script>
 </body>
 </html>

@@ -304,6 +304,7 @@
     };
 
     let faceLandmarker = null;
+    let visionResolver = null;
     let isRunning = false;
     let stream = null;
     let frameCount = 0;
@@ -813,13 +814,61 @@
         requestAnimationFrame(moveBubble);
     }
 
+    let config = {
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+    };
+
+    async function getVisionResolver() {
+        if (!visionResolver) {
+            visionResolver = await FilesetResolver.forVisionTasks(
+                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'
+            );
+        }
+        return visionResolver;
+    }
+
+    async function reinitFaceLandmarker() {
+        const wasRunning = isRunning;
+        if (wasRunning) {
+            isRunning = false; // Pause the processing loop
+            await new Promise(resolve => setTimeout(resolve, 200)); // Give time for the loop to stop
+        }
+
+        status.textContent = '🔄 正在使用新参数重新加载模型...';
+
+        try {
+            const vision = await getVisionResolver();
+            faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+                baseOptions: {
+                    modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+                    delegate: 'GPU'
+                },
+                outputFaceBlendshapes: true,
+                outputFacialTransformationMatrixes: false,
+                runningMode: 'VIDEO',
+                maxNumFaces: 1,
+                minDetectionConfidence: config.minDetectionConfidence,
+                minTrackingConfidence: config.minTrackingConfidence
+            });
+
+            status.textContent = '✅ 模型已更新';
+
+        } catch (error) {
+            status.textContent = `❌ 模型更新失败: ${error.message}`;
+        } finally {
+            if (wasRunning) {
+                isRunning = true;
+                processFrame(); // Restart the processing loop
+            }
+        }
+    }
+
     // 初始化 FaceLandmarker（使用 MediaPipe Tasks Vision API）
     async function initFaceLandmarker() {
         status.textContent = '🔄 正在加载 MediaPipe Tasks Vision 模型...';
 
-        const vision = await FilesetResolver.forVisionTasks(
-            'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'
-        );
+        const vision = await getVisionResolver();
 
         faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
             baseOptions: {
@@ -909,25 +958,19 @@
     }
 
     // ============ 直播模式逻辑 ============
-    function toggleLiveMode() {
+    liveModeBtn.addEventListener('click', () => {
         const isActive = document.body.classList.toggle('live-mode-active');
-        liveModeBtn.textContent = isActive ? '退出直播模式' : '进入直播模式';
-    }
-
-    liveModeBtn.addEventListener('click', toggleLiveMode);
+        if (isActive) {
+            liveModeBtn.textContent = '退出直播模式';
+        } else {
+            liveModeBtn.textContent = '进入直播模式';
+        }
+    });
 
 
     // 事件监听
     startBtn.addEventListener('click', start);
     stopBtn.addEventListener('click', stop);
-
-    // 自动启动并进入直播模式
-    window.addEventListener('load', async () => {
-        await start();
-        if (isRunning && !document.body.classList.contains('live-mode-active')) {
-            toggleLiveMode();
-        }
-    });
 </script>
 </body>
 </html>
